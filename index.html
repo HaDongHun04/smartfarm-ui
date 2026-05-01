@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Farm Control Dashboard</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MQTT.js -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <style>
+        body {
+            background-color: #f0f4f8;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        .bg-tuya-blue {
+            background-color: #4fc3f7;
+        }
+
+        .bg-tuya-green {
+            background-color: #4ade80;
+        }
+
+        .bg-tuya-orange {
+            background-color: #ff9800;
+        }
+
+        .bg-tuya-yellow {
+            background-color: #facc15;
+        }
+
+        .bg-tuya-off {
+            background-color: #d1d5db;
+        }
+
+        .btn-shadow {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .btn-transition {
+            transition: all 0.2s ease-in-out;
+        }
+
+        .btn-active {
+            transform: scale(0.95);
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid #ffffff;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .device-offline {
+            opacity: 0.6;
+            filter: grayscale(50%);
+            pointer-events: none;
+        }
+
+        /* 스크롤바 커스텀 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-gray-800 font-sans flex justify-center items-start">
+
+    <!-- ========================================== -->
+    <!-- 1. 로그인 뷰 -->
+    <!-- ========================================== -->
+    <div id="login-view" class="w-full max-w-md h-screen flex flex-col justify-center px-6 transition-opacity duration-300">
+        <div class="bg-white rounded-3xl p-8 shadow-sm text-center">
+            <div class="flex justify-center mb-4">
+                <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500">
+                    <i data-lucide="leaf" class="w-8 h-8"></i>
+                </div>
+            </div>
+            <h1 class="text-2xl font-extrabold tracking-tight mb-2">Smart Farm</h1>
+            <p class="text-sm text-gray-400 mb-6 font-medium">관리자 계정으로 접속하여 모든 기기를 제어하세요.</p>
+
+            <div class="space-y-3 mb-6 text-left">
+                <div>
+                    <label class="text-[11px] font-bold text-gray-400 ml-1">WebSocket URL</label>
+                    <input id="mqtt-url" type="text" value="wss://2cda7be527f245e1bfdd99c16a70d52d.s1.eu.hivemq.cloud:8884/mqtt"
+                           class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:bg-white transition-colors">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-gray-400 ml-1">계정 정보</label>
+                    <input id="mqtt-username" type="text" placeholder="Username"
+                           class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm mb-2 focus:outline-none focus:border-blue-400 focus:bg-white transition-colors">
+
+                    <div class="relative">
+                        <input id="mqtt-password" type="password" placeholder="Password를 입력하세요"
+                               class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:bg-white transition-colors">
+                        <button type="button" onclick="togglePassword()" class="absolute right-3 top-3 text-gray-400 hover:text-blue-500">
+                            <i data-lucide="eye" id="eye-icon" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <p id="login-error" class="text-red-500 text-xs font-bold mb-4 hidden"></p>
+
+            <button id="btn-login" onclick="connectMQTT()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-md shadow-blue-200">
+                <span id="btn-login-text">통합 관제 연결</span>
+                <div id="btn-login-spinner" class="spinner hidden"></div>
+            </button>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- 2. 다중 기기 대시보드 뷰 -->
+    <!-- ========================================== -->
+    <div id="dashboard-view" class="w-full max-w-md flex flex-col gap-4 p-4 md:p-8 hidden opacity-0 transition-opacity duration-500 pb-12">
+
+        <div class="flex justify-between items-center mb-2 px-1">
+            <div>
+                <h1 class="text-xl font-extrabold tracking-tight">통합 관제 패널</h1>
+                <p class="text-xs font-bold text-blue-500 tracking-wide mt-1" id="connection-status">● 서버 접속됨</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="requestAllStates()" class="p-2 bg-white rounded-full shadow-sm text-gray-500 hover:text-blue-500 transition-colors" title="전체 상태 동기화">
+                    <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                </button>
+                <button onclick="disconnectMQTT()" class="p-2 bg-white rounded-full shadow-sm text-gray-500 hover:text-red-500 transition-colors" title="로그아웃">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- ============================== -->
+        <!-- 기기 1: box01 -->
+        <!-- ============================== -->
+        <div id="card-box01" class="bg-white rounded-3xl p-6 shadow-sm btn-transition relative overflow-hidden">
+            <div id="status-badge-box01" class="absolute top-0 right-0 bg-gray-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl transition-colors">
+                확인 중...
+            </div>
+
+            <div class="flex items-center gap-4 mb-8 mt-2">
+                <div class="w-14 h-9 border border-gray-200 rounded-md flex items-center justify-center text-[8px] font-bold tracking-widest text-gray-500 shadow-inner bg-gray-50">BOX01</div>
+                <div class="flex-1">
+                    <h2 class="text-lg font-extrabold tracking-tight">10기 3조 담액식</h2>
+                    <div class="flex gap-2 text-[11px] font-medium text-gray-400 mt-1">
+                        <span id="ind-box01-ch1" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
+                        <span id="ind-box01-ch2" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
+                        <span id="ind-box01-ch3" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
+                        <span id="ind-box01-ch4" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-start px-1">
+                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 1)">
+                    <div id="btn-box01-ch1" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
+                        <i data-lucide="power" class="w-5 h-5"></i>
+                        <span id="mode-box01-ch1" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
+                    </div>
+                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">모터<br><span class="text-[10px] text-gray-400 font-normal">(CH1)</span></span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 2)">
+                    <div id="btn-box01-ch2" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
+                        <i data-lucide="power" class="w-5 h-5"></i>
+                        <span id="mode-box01-ch2" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
+                    </div>
+                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">예비<br><span class="text-[10px] text-gray-400 font-normal">(CH2)</span></span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 3)">
+                    <div id="btn-box01-ch3" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
+                        <i data-lucide="power" class="w-5 h-5"></i>
+                        <span id="mode-box01-ch3" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
+                    </div>
+                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">하단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH3)</span></span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 4)">
+                    <div id="btn-box01-ch4" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
+                        <i data-lucide="power" class="w-5 h-5"></i>
+                        <span id="mode-box01-ch4" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
+                    </div>
+                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">상단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH4)</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================== -->
+        <!-- 기기 2: box02 -->
+        <!-- ============================== -->
+        <div id="card-box02" class="bg-white rounded-3xl p-6 shadow-sm btn-transition relative overflow-hidden">
+            <div id="status-badge-box02" class="absolute top-0 right-0 bg-gray-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl transition-colors">
+                확인 중...
+            </div>
+
+            <div class="flex items-center gap-4 mb-8 mt-2">
+                <div class="w-14 h-9 border border-gray-200 rounded-md flex items-center justify-center text-[8px] font-bold tracking-widest text-gray-500 shadow-inner bg-gray-50">BOX02</div>
+                <div class="flex-1">
+                    <h2 class="text-lg font-extrabold tracking-tight">스마트팜 10기 3조 분무식</h2>
+                    <div class="flex gap-2 text-[11px] font-medium text-gray-400 mt-1">
+                        <span id="ind-box02-ch1" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
+                        <span id="ind-box02-ch2" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
+                        <span id="ind-box02-ch3" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
+                        <span id="ind-box02-ch4" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-start px-1">
+                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 1)">
+                    <div id="btn-box02-ch1" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
+                        <i data-lucide="power" class="w-5 h-5"></i>
+                        <span id="mode-box02-ch1" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
+                    </div>
+                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">상단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH1)</span></span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 2)">
+                    <div id="btn-box02-ch2" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
+                        <i data-lucide="power" class="w-5 h-5"></i>
+                        <span id="mode-box02-ch2" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
+                    </div>
+                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">하단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH2)</span></span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 3)">
+                    <div id="btn-box02-ch3" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
+                        <i data-lucide="power" class="w-5 h-5"></i>
+                        <span id="mode-box02-ch3" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
+                    </div>
+                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">분무 모터<br><span class="text-[10px] text-gray-400 font-normal">(CH3)</span></span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 4)">
+                    <div id="btn-box02-ch4" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
+                        <i data-lucide="power" class="w-5 h-5"></i>
+                        <span id="mode-box02-ch4" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
+                    </div>
+                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">예비<br><span class="text-[10px] text-gray-400 font-normal">(CH4)</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================== -->
+        <!-- 💡 실시간 디버그 콘솔 -->
+        <!-- ============================== -->
+        <div class="bg-gray-900 rounded-2xl p-4 shadow-inner mt-2">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-bold text-gray-400"><i data-lucide="terminal" class="w-3 h-3 inline mr-1"></i>실시간 통신 로그</span>
+                <button onclick="document.getElementById('debug-log').innerHTML=''" class="text-[10px] bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition-colors">지우기</button>
+            </div>
+            <div id="debug-log" class="text-[11px] font-mono text-green-400 h-32 overflow-y-auto leading-relaxed break-all">
+                대기 중...<br>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        function togglePassword() {
+        const pwdInput = document.getElementById('mqtt-password');
+        const eyeIcon = document.getElementById('eye-icon');
+        if (pwdInput.type === "password") {
+        pwdInput.type = "text";
+        eyeIcon.setAttribute('data-lucide', 'eye-off');
+        } else {
+        pwdInput.type = "password";
+        eyeIcon.setAttribute('data-lucide', 'eye');
+        }
+        lucide.createIcons();
+        }
+
+        function logDebug(msg, type = 'info') {
+        const logDiv = document.getElementById('debug-log');
+        if(logDiv) {
+        const time = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+        let colorClass = 'text-green-400';
+        if (type === 'recv') colorClass = 'text-blue-300';
+        if (type === 'send') colorClass = 'text-yellow-300';
+        if (type === 'error') colorClass = 'text-red-400';
+
+        logDiv.innerHTML += `<span class="text-gray-500">[${time}]</span> <span class="${colorClass}">${msg}</span><br>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        console.log(msg);
+        }
+
+        let client = null;
+        const deviceList = ['box01', 'box02'];
+
+        const deviceStates = {
+        'box01': { online: false, channels: {} },
+        'box02': { online: false, channels: {} }
+        };
+
+        const colorMap = {
+        1: 'bg-tuya-blue', 2: 'bg-tuya-green', 3: 'bg-tuya-orange', 4: 'bg-tuya-yellow'
+        };
+
+        function connectMQTT() {
+        const url = document.getElementById('mqtt-url').value.trim();
+        const username = document.getElementById('mqtt-username').value.trim();
+        const password = document.getElementById('mqtt-password').value.trim();
+        const errorText = document.getElementById('login-error');
+
+        if(!url || !username || !password) {
+        errorText.innerText = "접속 정보를 모두 입력하세요.";
+        errorText.classList.remove('hidden');
+        return;
+        }
+
+        setLoading(true);
+        errorText.classList.add('hidden');
+        document.getElementById('debug-log').innerHTML = '';
+
+        const clientId = 'web_control_' + Math.random().toString(16).substring(2, 8);
+
+        const options = {
+        clientId: clientId,
+        username: username,
+        password: password,
+        keepalive: 60,
+        clean: true,
+        reconnectPeriod: 0
+        };
+
+        logDebug(`접속 시도 중... (URL: ${url})`);
+        client = mqtt.connect(url, options);
+
+        client.on('connect', function () {
+        logDebug("✅ 브로커 서버 로그인 성공!");
+        setLoading(false);
+        switchToDashboard();
+
+        // 💡 [핵심 수정] 타이밍 이슈(Race Condition) 완벽 차단
+        // 각 기기별로 명확하게 구독을 걸고, 구독이 "완벽히 승인(Granted)"된 직후에만 GET을 날립니다.
+        deviceList.forEach(deviceId => {
+        const baseTopic = `hdh/${deviceId}/`;
+        const topicsToSub = [
+        baseTopic + 'state/full',
+        baseTopic + 'ch/+/state',
+        baseTopic + 'meta/online'
+        ];
+
+        // 구독 신청
+        client.subscribe(topicsToSub, { qos: 1 }, function(err) {
+        if(!err) {
+        logDebug(`📡 [${deviceId}] 통신망 구독이 서버에 등록되었습니다.`);
+        // 이제 안전하므로 상태를 요청합니다.
+        const reqTopic = baseTopic + 'get/state';
+        logDebug(`📤 [발신] ${deviceId} 상태 요청 -> ${reqTopic}`, 'send');
+        client.publish(reqTopic, "GET", { qos: 1, retain: false });
+        } else {
+        logDebug(`❌ [${deviceId}] 구독 에러 발생: ${err}`, 'error');
+        }
+        });
+        });
+        });
+
+        client.on('error', function (err) {
+        logDebug("❌ 접속 에러 발생", 'error');
+        setLoading(false);
+        errorText.innerHTML = "연결 실패. 비밀번호 오타가 없거나, 8884 포트가 막혔는지 확인하세요.";
+        errorText.classList.remove('hidden');
+        if (client) client.end();
+        });
+
+        // ---------------------------------------------------------
+        // 수신 로직 (파싱 및 디버그 출력)
+        // ---------------------------------------------------------
+        client.on('message', function (topic, message) {
+        const payload = message.toString();
+        logDebug(`📥 [수신] ${topic} : ${payload}`, 'recv');
+
+        const parts = topic.split('/');
+        if (parts[0] !== 'hdh') return;
+
+        const deviceId = parts[1];
+        if (!deviceId || !deviceList.includes(deviceId)) return;
+
+        try {
+        // 전체 상태 파싱
+        if (topic.endsWith('/state/full')) {
+        const data = JSON.parse(payload);
+        if (data.ch && Array.isArray(data.ch)) {
+        data.ch.forEach(c => {
+        updateChannelUI(deviceId, c.n, c.relay, c.mode);
+        });
+        updateOnlineStatus(deviceId, true);
+        }
+        }
+        // 개별 상태 파싱
+        else if (topic.includes('/ch/') && topic.endsWith('/state')) {
+        const chNum = parseInt(parts[3], 10);
+        const data = JSON.parse(payload);
+        if(chNum && data.hasOwnProperty('relay')) {
+        updateChannelUI(deviceId, chNum, data.relay, data.mode);
+        }
+        }
+        // 연결 상태 파싱
+        else if (topic.endsWith('/meta/online')) {
+        const data = JSON.parse(payload);
+        updateOnlineStatus(deviceId, data.online);
+        }
+        } catch (e) {
+        logDebug(`❌ JSON 해석 오류: ${e.message}`, 'error');
+        }
+        });
+        }
+
+        function requestAllStates() {
+        if(client && client.connected) {
+        deviceList.forEach(deviceId => {
+        const reqTopic = `hdh/${deviceId}/get/state`;
+        logDebug(`📤 [발신] 수동 상태 요청 -> ${reqTopic}`, 'send');
+        client.publish(reqTopic, "GET", { qos: 1, retain: false });
+        });
+        }
+        }
+
+        function disconnectMQTT() {
+        if(client && client.connected) client.end();
+        document.getElementById('dashboard-view').classList.add('hidden');
+        document.getElementById('dashboard-view').classList.remove('opacity-100');
+        document.getElementById('login-view').classList.remove('hidden');
+
+        deviceList.forEach(dev => updateOnlineStatus(dev, false, true));
+        }
+
+        function toggleChannel(deviceId, chNum) {
+        if(!client || !client.connected) {
+        alert("관제 서버와 연결되어 있지 않습니다.");
+        return;
+        }
+
+        if(deviceStates[deviceId] && deviceStates[deviceId].online === false) {
+        alert(`${deviceId} 기기가 오프라인입니다. 아두이노 전원과 와이파이를 확인하세요.`);
+        return;
+        }
+
+        const btnElement = document.getElementById(`btn-${deviceId}-ch${chNum}`);
+        if(btnElement) {
+        btnElement.classList.add('btn-active');
+        setTimeout(() => btnElement.classList.remove('btn-active'), 150);
+        }
+
+        const currentState = deviceStates[deviceId].channels[chNum]?.relay || false;
+        const targetCommand = currentState ? "OFF" : "ON";
+        const topic = `hdh/${deviceId}/ch/${chNum}/cmd`;
+
+        logDebug(`📤 [발신] 제어 명령 -> ${topic} : ${targetCommand}`, 'send');
+        client.publish(topic, targetCommand, { qos: 1, retain: false });
+
+        // 즉각적인 시각 피드백
+        updateChannelUI(deviceId, chNum, !currentState, deviceStates[deviceId].channels[chNum]?.mode || 0);
+        }
+
+        function updateChannelUI(deviceId, chNum, isRelayOn, mode) {
+        if(!deviceStates[deviceId].channels[chNum]) deviceStates[deviceId].channels[chNum] = {};
+        deviceStates[deviceId].channels[chNum].relay = isRelayOn;
+        deviceStates[deviceId].channels[chNum].mode = mode;
+
+        const btnElement = document.getElementById(`btn-${deviceId}-ch${chNum}`);
+        const indicatorElement = document.getElementById(`ind-${deviceId}-ch${chNum}`);
+        const modeBadge = document.getElementById(`mode-${deviceId}-ch${chNum}`);
+
+        if (!btnElement || !indicatorElement) return;
+
+        const colorClass = colorMap[chNum] || 'bg-tuya-blue';
+
+        if (isRelayOn) {
+        btnElement.classList.remove('bg-tuya-off');
+        btnElement.classList.add(colorClass);
+        indicatorElement.innerHTML = `<i data-lucide="power" class="w-3 h-3 mr-0.5 text-blue-500"></i><span class="text-blue-500 font-bold">ON</span>`;
+        } else {
+        btnElement.classList.remove(colorClass);
+        btnElement.classList.add('bg-tuya-off');
+        indicatorElement.innerHTML = `<i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF`;
+        }
+
+        if (mode !== 0 && modeBadge) {
+        modeBadge.classList.remove('hidden');
+        if (mode === 1) { modeBadge.innerText = '스케줄'; }
+        else if (mode === 2) { modeBadge.innerText = '순환'; }
+        else if (mode === 3) { modeBadge.innerText = '인칭'; }
+        } else if (modeBadge) {
+        modeBadge.classList.add('hidden');
+        }
+
+        lucide.createIcons();
+        }
+
+        function updateOnlineStatus(deviceId, isOnline, forceOffline = false) {
+        deviceStates[deviceId].online = forceOffline ? false : isOnline;
+
+        const card = document.getElementById(`card-${deviceId}`);
+        const badge = document.getElementById(`status-badge-${deviceId}`);
+        if(!card || !badge) return;
+
+        if(isOnline && !forceOffline) {
+        card.classList.remove('device-offline');
+        badge.classList.remove('bg-gray-500', 'bg-red-500');
+        badge.classList.add('bg-green-500');
+        badge.innerText = '온라인';
+        } else {
+        card.classList.add('device-offline');
+        badge.classList.remove('bg-gray-500', 'bg-green-500');
+        badge.classList.add('bg-red-500');
+        badge.innerText = '오프라인';
+        }
+        }
+
+        function setLoading(isLoading) {
+        const btnText = document.getElementById('btn-login-text');
+        const spinner = document.getElementById('btn-login-spinner');
+        const btn = document.getElementById('btn-login');
+
+        if(isLoading) {
+        btnText.innerText = "서버 인증 중...";
+        spinner.classList.remove('hidden');
+        btn.disabled = true;
+        btn.classList.add('opacity-80');
+        } else {
+        btnText.innerText = "통합 관제 연결";
+        spinner.classList.add('hidden');
+        btn.disabled = false;
+        btn.classList.remove('opacity-80');
+        }
+        }
+
+        function switchToDashboard() {
+        const loginView = document.getElementById('login-view');
+        const dashboardView = document.getElementById('dashboard-view');
+        loginView.classList.add('hidden');
+        dashboardView.classList.remove('hidden');
+        setTimeout(() => { dashboardView.classList.add('opacity-100'); }, 50);
+        }
+    </script>
+</body>
+</html>
