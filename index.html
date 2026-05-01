@@ -171,7 +171,7 @@
                 <div class="w-14 h-9 border border-gray-200 rounded-md flex items-center justify-center text-[8px] font-bold tracking-widest text-gray-500 shadow-inner bg-gray-50">BOX01</div>
                 <div class="flex-1">
                     <h2 class="text-lg font-extrabold tracking-tight">10기 3조 담액식</h2>
-                    <div class="flex gap-2 text-[11px] font-medium text-gray-400 mt-1">
+                    <div id="indicators-box01" class="flex flex-wrap gap-2 text-[11px] font-medium text-gray-400 mt-1">
                         <span id="ind-box01-ch1" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
                         <span id="ind-box01-ch2" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
                         <span id="ind-box01-ch3" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
@@ -180,35 +180,49 @@
                 </div>
             </div>
 
-            <div class="flex justify-between items-start px-1">
+            <div id="channels-box01" class="grid grid-cols-2 sm:grid-cols-4 gap-4 px-1">
                 <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 1)">
                     <div id="btn-box01-ch1" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
                         <i data-lucide="power" class="w-5 h-5"></i>
                         <span id="mode-box01-ch1" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
                     </div>
-                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">모터<br><span class="text-[10px] text-gray-400 font-normal">(CH1)</span></span>
+                    <span id="label-box01-ch1" class="text-[13px] font-bold text-gray-700 text-center leading-tight">모터<br><span class="text-[10px] text-gray-400 font-normal">(CH1)</span></span>
                 </div>
                 <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 2)">
                     <div id="btn-box01-ch2" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
                         <i data-lucide="power" class="w-5 h-5"></i>
                         <span id="mode-box01-ch2" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
                     </div>
-                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">예비<br><span class="text-[10px] text-gray-400 font-normal">(CH2)</span></span>
+                    <span id="label-box01-ch2" class="text-[13px] font-bold text-gray-700 text-center leading-tight">예비<br><span class="text-[10px] text-gray-400 font-normal">(CH2)</span></span>
                 </div>
                 <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 3)">
                     <div id="btn-box01-ch3" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
                         <i data-lucide="power" class="w-5 h-5"></i>
                         <span id="mode-box01-ch3" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
                     </div>
-                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">하단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH3)</span></span>
+                    <span id="label-box01-ch3" class="text-[13px] font-bold text-gray-700 text-center leading-tight">하단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH3)</span></span>
                 </div>
                 <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 4)">
                     <div id="btn-box01-ch4" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
                         <i data-lucide="power" class="w-5 h-5"></i>
                         <span id="mode-box01-ch4" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
                     </div>
-                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">상단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH4)</span></span>
+                    <span id="label-box01-ch4" class="text-[13px] font-bold text-gray-700 text-center leading-tight">상단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH4)</span></span>
                 </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-gray-100">
+                <div class="grid grid-cols-[88px_1fr] gap-2">
+                    <select id="new-box01-ch" class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold focus:outline-none focus:border-blue-400"></select>
+                    <input id="new-box01-pin" type="number" min="0" max="127" inputmode="numeric" placeholder="GPIO Pin"
+                           class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-400">
+                    <input id="new-box01-name" type="text" maxlength="15" placeholder="채널 이름"
+                           class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-400">
+                    <button id="add-box01-btn" type="button" onclick="addChannel('box01')" class="bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors">
+                        <i data-lucide="plus" class="w-4 h-4"></i>추가
+                    </button>
+                </div>
+                <p id="add-error-box01" class="hidden mt-2 text-[11px] font-bold text-red-500"></p>
             </div>
         </div>
 
@@ -224,7 +238,7 @@
                 <div class="w-14 h-9 border border-gray-200 rounded-md flex items-center justify-center text-[8px] font-bold tracking-widest text-gray-500 shadow-inner bg-gray-50">BOX02</div>
                 <div class="flex-1">
                     <h2 class="text-lg font-extrabold tracking-tight">스마트팜 10기 3조 분무식</h2>
-                    <div class="flex gap-2 text-[11px] font-medium text-gray-400 mt-1">
+                    <div id="indicators-box02" class="flex flex-wrap gap-2 text-[11px] font-medium text-gray-400 mt-1">
                         <span id="ind-box02-ch1" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
                         <span id="ind-box02-ch2" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
                         <span id="ind-box02-ch3" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
@@ -233,35 +247,49 @@
                 </div>
             </div>
 
-            <div class="flex justify-between items-start px-1">
+            <div id="channels-box02" class="grid grid-cols-2 sm:grid-cols-4 gap-4 px-1">
                 <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 1)">
                     <div id="btn-box02-ch1" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
                         <i data-lucide="power" class="w-5 h-5"></i>
                         <span id="mode-box02-ch1" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
                     </div>
-                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">상단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH1)</span></span>
+                    <span id="label-box02-ch1" class="text-[13px] font-bold text-gray-700 text-center leading-tight">상단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH1)</span></span>
                 </div>
                 <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 2)">
                     <div id="btn-box02-ch2" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
                         <i data-lucide="power" class="w-5 h-5"></i>
                         <span id="mode-box02-ch2" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
                     </div>
-                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">하단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH2)</span></span>
+                    <span id="label-box02-ch2" class="text-[13px] font-bold text-gray-700 text-center leading-tight">하단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH2)</span></span>
                 </div>
                 <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 3)">
                     <div id="btn-box02-ch3" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
                         <i data-lucide="power" class="w-5 h-5"></i>
                         <span id="mode-box02-ch3" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
                     </div>
-                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">분무 모터<br><span class="text-[10px] text-gray-400 font-normal">(CH3)</span></span>
+                    <span id="label-box02-ch3" class="text-[13px] font-bold text-gray-700 text-center leading-tight">분무 모터<br><span class="text-[10px] text-gray-400 font-normal">(CH3)</span></span>
                 </div>
                 <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 4)">
                     <div id="btn-box02-ch4" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
                         <i data-lucide="power" class="w-5 h-5"></i>
                         <span id="mode-box02-ch4" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
                     </div>
-                    <span class="text-[13px] font-bold text-gray-700 text-center leading-tight">예비<br><span class="text-[10px] text-gray-400 font-normal">(CH4)</span></span>
+                    <span id="label-box02-ch4" class="text-[13px] font-bold text-gray-700 text-center leading-tight">예비<br><span class="text-[10px] text-gray-400 font-normal">(CH4)</span></span>
                 </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-gray-100">
+                <div class="grid grid-cols-[88px_1fr] gap-2">
+                    <select id="new-box02-ch" class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold focus:outline-none focus:border-blue-400"></select>
+                    <input id="new-box02-pin" type="number" min="0" max="127" inputmode="numeric" placeholder="GPIO Pin"
+                           class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-400">
+                    <input id="new-box02-name" type="text" maxlength="15" placeholder="채널 이름"
+                           class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-400">
+                    <button id="add-box02-btn" type="button" onclick="addChannel('box02')" class="bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors">
+                        <i data-lucide="plus" class="w-4 h-4"></i>추가
+                    </button>
+                </div>
+                <p id="add-error-box02" class="hidden mt-2 text-[11px] font-bold text-red-500"></p>
             </div>
         </div>
 
@@ -313,15 +341,17 @@
 
         let client = null;
         const deviceList = ['box01', 'box02'];
+        const maxChannels = 12;
+        const allChannels = Array.from({ length: maxChannels }, (_, i) => i + 1);
 
         const deviceStates = {
-        'box01': { online: false, channels: {} },
-        'box02': { online: false, channels: {} }
+        'box01': { online: false, cfgLoaded: false, cfgSeen: {}, channels: {} },
+        'box02': { online: false, cfgLoaded: false, cfgSeen: {}, channels: {} }
         };
 
-        const colorMap = {
-        1: 'bg-tuya-blue', 2: 'bg-tuya-green', 3: 'bg-tuya-orange', 4: 'bg-tuya-yellow'
-        };
+        const channelColorClasses = ['bg-tuya-blue', 'bg-tuya-green', 'bg-tuya-orange', 'bg-tuya-yellow'];
+
+        renderAllDevices();
 
         function connectMQTT() {
         const url = document.getElementById('mqtt-url').value.trim();
@@ -365,6 +395,7 @@
         const topicsToSub = [
         baseTopic + 'state/full',
         baseTopic + 'ch/+/state',
+        baseTopic + 'ch/+/cfg',
         baseTopic + 'meta/online'
         ];
 
@@ -376,6 +407,7 @@
         const reqTopic = baseTopic + 'get/state';
         logDebug(`📤 [발신] ${deviceId} 상태 요청 -> ${reqTopic}`, 'send');
         client.publish(reqTopic, "GET", { qos: 1, retain: false });
+        requestChannelConfigs(deviceId);
         } else {
         logDebug(`❌ [${deviceId}] 구독 에러 발생: ${err}`, 'error');
         }
@@ -411,6 +443,7 @@
         if (data.ch && Array.isArray(data.ch)) {
         data.ch.forEach(c => {
         updateChannelUI(deviceId, c.n, c.relay, c.mode);
+        if (c.hasOwnProperty('name')) updateChannelConfig(deviceId, c.n, c);
         });
         updateOnlineStatus(deviceId, true);
         }
@@ -421,6 +454,15 @@
         const data = JSON.parse(payload);
         if(chNum && data.hasOwnProperty('relay')) {
         updateChannelUI(deviceId, chNum, data.relay, data.mode);
+        if (data.hasOwnProperty('name')) updateChannelConfig(deviceId, chNum, data);
+        }
+        }
+        // 채널 설정 파싱
+        else if (topic.includes('/ch/') && topic.endsWith('/cfg')) {
+        const chNum = parseInt(parts[3], 10);
+        const data = JSON.parse(payload);
+        if(chNum) {
+        updateChannelConfig(deviceId, chNum, data);
         }
         }
         // 연결 상태 파싱
@@ -440,8 +482,23 @@
         const reqTopic = `hdh/${deviceId}/get/state`;
         logDebug(`📤 [발신] 수동 상태 요청 -> ${reqTopic}`, 'send');
         client.publish(reqTopic, "GET", { qos: 1, retain: false });
+        requestChannelConfigs(deviceId);
         });
         }
+        }
+
+        function requestChannelConfigs(deviceId) {
+        if(!client || !client.connected) return;
+
+        deviceStates[deviceId].cfgLoaded = false;
+        deviceStates[deviceId].cfgSeen = {};
+        renderDevice(deviceId);
+
+        logDebug(`📤 [발신] ${deviceId} 채널 설정 요청 (CH1-CH${maxChannels})`, 'send');
+        allChannels.forEach(chNum => {
+        const reqTopic = `hdh/${deviceId}/get/ch/${chNum}`;
+        client.publish(reqTopic, "GET", { qos: 1, retain: false });
+        });
         }
 
         function disconnectMQTT() {
@@ -482,38 +539,239 @@
         }
 
         function updateChannelUI(deviceId, chNum, isRelayOn, mode) {
-        if(!deviceStates[deviceId].channels[chNum]) deviceStates[deviceId].channels[chNum] = {};
-        deviceStates[deviceId].channels[chNum].relay = isRelayOn;
-        deviceStates[deviceId].channels[chNum].mode = mode;
-
-        const btnElement = document.getElementById(`btn-${deviceId}-ch${chNum}`);
-        const indicatorElement = document.getElementById(`ind-${deviceId}-ch${chNum}`);
-        const modeBadge = document.getElementById(`mode-${deviceId}-ch${chNum}`);
-
-        if (!btnElement || !indicatorElement) return;
-
-        const colorClass = colorMap[chNum] || 'bg-tuya-blue';
-
-        if (isRelayOn) {
-        btnElement.classList.remove('bg-tuya-off');
-        btnElement.classList.add(colorClass);
-        indicatorElement.innerHTML = `<i data-lucide="power" class="w-3 h-3 mr-0.5 text-blue-500"></i><span class="text-blue-500 font-bold">ON</span>`;
-        } else {
-        btnElement.classList.remove(colorClass);
-        btnElement.classList.add('bg-tuya-off');
-        indicatorElement.innerHTML = `<i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF`;
+        const channel = ensureChannelState(deviceId, chNum);
+        channel.relay = !!isRelayOn;
+        channel.mode = Number(mode) || 0;
+        renderDevice(deviceId);
         }
 
-        if (mode !== 0 && modeBadge) {
-        modeBadge.classList.remove('hidden');
-        if (mode === 1) { modeBadge.innerText = '스케줄'; }
-        else if (mode === 2) { modeBadge.innerText = '순환'; }
-        else if (mode === 3) { modeBadge.innerText = '인칭'; }
-        } else if (modeBadge) {
-        modeBadge.classList.add('hidden');
+        function updateChannelConfig(deviceId, chNum, data) {
+        const channel = ensureChannelState(deviceId, chNum);
+        deviceStates[deviceId].cfgSeen[chNum] = true;
+        deviceStates[deviceId].cfgLoaded = allChannels.every(num => deviceStates[deviceId].cfgSeen[num]);
+
+        if (data.hasOwnProperty('name')) {
+        channel.name = String(data.name || '').trim();
+        }
+        if (data.hasOwnProperty('pin')) {
+        channel.pin = Number(data.pin);
+        }
+        if (data.hasOwnProperty('lvl')) {
+        channel.lvl = Number(data.lvl);
+        }
+        if (data.hasOwnProperty('init')) {
+        channel.init = Number(data.init);
+        }
+        if (data.hasOwnProperty('mode')) {
+        channel.mode = Number(data.mode) || 0;
         }
 
+        renderDevice(deviceId);
+        }
+
+        function addChannel(deviceId) {
+        if(!client || !client.connected) {
+        alert("관제 서버와 연결되어 있지 않습니다.");
+        return;
+        }
+        if(deviceStates[deviceId] && deviceStates[deviceId].online === false) {
+        alert(`${deviceId} 기기가 오프라인입니다. 아두이노 전원과 와이파이를 확인하세요.`);
+        return;
+        }
+
+        const chSelect = document.getElementById(`new-${deviceId}-ch`);
+        const pinInput = document.getElementById(`new-${deviceId}-pin`);
+        const nameInput = document.getElementById(`new-${deviceId}-name`);
+        const chNum = parseInt(chSelect?.value, 10);
+        const pin = parseInt(pinInput?.value, 10);
+        const name = (nameInput?.value || '').trim();
+
+        if(!chNum || chNum < 1 || chNum > maxChannels) {
+        setAddError(deviceId, "추가할 채널을 선택하세요.");
+        return;
+        }
+        if(isAssignedChannel(deviceId, chNum)) {
+        setAddError(deviceId, `CH${chNum}은 이미 이름이 지정되어 있습니다.`);
+        return;
+        }
+        if(!Number.isInteger(pin) || pin < 0 || pin > 127) {
+        setAddError(deviceId, "GPIO Pin은 0~127 사이 숫자로 입력하세요.");
+        return;
+        }
+        if(!name) {
+        setAddError(deviceId, "채널 이름을 입력하세요.");
+        return;
+        }
+        if(/\s/.test(name)) {
+        setAddError(deviceId, "현재 펌웨어 형식상 채널 이름에는 공백을 넣을 수 없습니다.");
+        return;
+        }
+        if(getUtf8ByteLength(name) > 15) {
+        setAddError(deviceId, "채널 이름은 UTF-8 기준 15바이트 이하여야 합니다.");
+        return;
+        }
+
+        const pinTopic = `hdh/${deviceId}/cfg/ch/${chNum}/pin`;
+        const nameTopic = `hdh/${deviceId}/cfg/ch/${chNum}/name`;
+        const pinPayload = `${pin} 1 0`;
+
+        logDebug(`📤 [발신] 채널 핀 설정 -> ${pinTopic} : ${pinPayload}`, 'send');
+        client.publish(pinTopic, pinPayload, { qos: 1, retain: false });
+        logDebug(`📤 [발신] 채널 이름 설정 -> ${nameTopic} : ${name}`, 'send');
+        client.publish(nameTopic, name, { qos: 1, retain: false });
+
+        updateChannelConfig(deviceId, chNum, { name, pin, lvl: 1, init: 0, mode: 0 });
+        updateChannelUI(deviceId, chNum, false, 0);
+        setAddError(deviceId, "");
+        pinInput.value = '';
+        nameInput.value = '';
+
+        setTimeout(() => requestChannelConfig(deviceId, chNum), 500);
+        }
+
+        function requestChannelConfig(deviceId, chNum) {
+        if(!client || !client.connected) return;
+        const reqTopic = `hdh/${deviceId}/get/ch/${chNum}`;
+        client.publish(reqTopic, "GET", { qos: 1, retain: false });
+        }
+
+        function ensureChannelState(deviceId, chNum) {
+        if(!deviceStates[deviceId].channels[chNum]) {
+        deviceStates[deviceId].channels[chNum] = { relay: false, mode: 0, name: '' };
+        }
+        return deviceStates[deviceId].channels[chNum];
+        }
+
+        function isAssignedChannel(deviceId, chNum) {
+        const name = deviceStates[deviceId].channels[chNum]?.name;
+        return typeof name === 'string' && name.trim().length > 0;
+        }
+
+        function getAssignedChannels(deviceId) {
+        return allChannels.filter(chNum => isAssignedChannel(deviceId, chNum));
+        }
+
+        function renderAllDevices() {
+        deviceList.forEach(deviceId => renderDevice(deviceId));
+        }
+
+        function renderDevice(deviceId) {
+        renderChannelIndicators(deviceId);
+        renderChannelButtons(deviceId);
+        renderAddChannelOptions(deviceId);
         lucide.createIcons();
+        }
+
+        function renderChannelIndicators(deviceId) {
+        const indicatorWrap = document.getElementById(`indicators-${deviceId}`);
+        if(!indicatorWrap) return;
+
+        const assignedChannels = getAssignedChannels(deviceId);
+        if(assignedChannels.length === 0) {
+        indicatorWrap.innerHTML = '<span class="text-gray-400">등록된 채널 없음</span>';
+        return;
+        }
+
+        indicatorWrap.innerHTML = assignedChannels.map(chNum => {
+        const channel = ensureChannelState(deviceId, chNum);
+        const on = !!channel.relay;
+        const statusClass = on ? 'text-blue-500 font-bold' : '';
+        return `<span id="ind-${deviceId}-ch${chNum}" class="flex items-center ${statusClass}"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>${on ? 'ON' : 'OFF'}</span>`;
+        }).join('');
+        }
+
+        function renderChannelButtons(deviceId) {
+        const container = document.getElementById(`channels-${deviceId}`);
+        if(!container) return;
+
+        const assignedChannels = getAssignedChannels(deviceId);
+        if(assignedChannels.length === 0) {
+        container.innerHTML = '<div class="text-center text-xs font-bold text-gray-400 py-5 bg-gray-50 rounded-xl" style="grid-column:1/-1;">이름이 지정된 채널이 없습니다.</div>';
+        return;
+        }
+
+        container.innerHTML = assignedChannels.map(chNum => renderChannelButton(deviceId, chNum)).join('');
+        }
+
+        function renderChannelButton(deviceId, chNum) {
+        const channel = ensureChannelState(deviceId, chNum);
+        const name = escapeHtml(channel.name || `CH${chNum}`);
+        const isRelayOn = !!channel.relay;
+        const mode = Number(channel.mode) || 0;
+        const colorClass = isRelayOn ? getChannelColorClass(chNum) : 'bg-tuya-off';
+        const modeText = getModeText(mode);
+        const modeClass = mode === 0 ? 'hidden' : '';
+
+        return `
+        <button type="button" class="flex flex-col items-center gap-2 cursor-pointer w-full text-center" style="min-height:96px;" onclick="toggleChannel('${deviceId}', ${chNum})">
+            <div id="btn-${deviceId}-ch${chNum}" class="w-12 h-12 rounded-full ${colorClass} flex items-center justify-center text-white btn-shadow btn-transition relative">
+                <i data-lucide="power" class="w-5 h-5"></i>
+                <span id="mode-${deviceId}-ch${chNum}" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap ${modeClass}">${modeText}</span>
+            </div>
+            <span id="label-${deviceId}-ch${chNum}" class="text-[13px] font-bold text-gray-700 text-center leading-tight w-full" style="word-break:keep-all; overflow-wrap:anywhere;">${name}<br><span class="text-[10px] text-gray-400 font-normal">(CH${chNum})</span></span>
+        </button>`;
+        }
+
+        function renderAddChannelOptions(deviceId) {
+        const select = document.getElementById(`new-${deviceId}-ch`);
+        const button = document.getElementById(`add-${deviceId}-btn`);
+        if(!select || !button) return;
+
+        const current = select.value;
+        const available = allChannels.filter(chNum => !isAssignedChannel(deviceId, chNum));
+
+        if(!deviceStates[deviceId].cfgLoaded) {
+        select.innerHTML = '<option value="">확인 중</option>';
+        select.disabled = true;
+        button.disabled = true;
+        button.classList.add('opacity-50');
+        return;
+        }
+
+        if(available.length === 0) {
+        select.innerHTML = '<option value="">가득 참</option>';
+        select.disabled = true;
+        button.disabled = true;
+        button.classList.add('opacity-50');
+        return;
+        }
+
+        select.disabled = false;
+        button.disabled = false;
+        button.classList.remove('opacity-50');
+        select.innerHTML = available.map(chNum => `<option value="${chNum}">CH${chNum}</option>`).join('');
+        if(available.includes(Number(current))) select.value = current;
+        }
+
+        function getChannelColorClass(chNum) {
+        return channelColorClasses[(chNum - 1) % channelColorClasses.length];
+        }
+
+        function getModeText(mode) {
+        if (mode === 1) return '스케줄';
+        if (mode === 2) return '순환';
+        if (mode === 3) return '인칭';
+        return '모드';
+        }
+
+        function setAddError(deviceId, message) {
+        const errorElement = document.getElementById(`add-error-${deviceId}`);
+        if(!errorElement) return;
+        errorElement.innerText = message;
+        errorElement.classList.toggle('hidden', !message);
+        }
+
+        function getUtf8ByteLength(value) {
+        return new TextEncoder().encode(value).length;
+        }
+
+        function escapeHtml(value) {
+        return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
         }
 
         function updateOnlineStatus(deviceId, isOnline, forceOffline = false) {
