@@ -108,30 +108,30 @@
             <h1 class="text-2xl font-extrabold tracking-tight mb-2">Smart Farm</h1>
             <p class="text-sm text-gray-400 mb-6 font-medium">관리자 계정으로 접속하여 모든 기기를 제어하세요.</p>
 
-            <div class="space-y-3 mb-6 text-left">
+            <form class="space-y-3 mb-6 text-left" onsubmit="connectMQTT(); return false;">
                 <div>
                     <label class="text-[11px] font-bold text-gray-400 ml-1">WebSocket URL</label>
-                    <input id="mqtt-url" type="text" value="wss://2cda7be527f245e1bfdd99c16a70d52d.s1.eu.hivemq.cloud:8884/mqtt"
+                    <input id="mqtt-url" name="mqtt_url" type="text" autocomplete="off" value="wss://2cda7be527f245e1bfdd99c16a70d52d.s1.eu.hivemq.cloud:8884/mqtt"
                            class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:bg-white transition-colors">
                 </div>
                 <div>
                     <label class="text-[11px] font-bold text-gray-400 ml-1">계정 정보</label>
-                    <input id="mqtt-username" type="text" placeholder="Username"
+                    <input id="mqtt-username" name="username" type="text" autocomplete="username" placeholder="Username"
                            class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm mb-2 focus:outline-none focus:border-blue-400 focus:bg-white transition-colors">
 
                     <div class="relative">
-                        <input id="mqtt-password" type="password" placeholder="Password를 입력하세요"
+                        <input id="mqtt-password" name="password" type="password" autocomplete="current-password" placeholder="Password를 입력하세요"
                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:bg-white transition-colors">
                         <button type="button" onclick="togglePassword()" class="absolute right-3 top-3 text-gray-400 hover:text-blue-500">
                             <i data-lucide="eye" id="eye-icon" class="w-5 h-5"></i>
                         </button>
                     </div>
                 </div>
-            </div>
+            </form>
 
             <p id="login-error" class="text-red-500 text-xs font-bold mb-4 hidden"></p>
 
-            <button id="btn-login" onclick="connectMQTT()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-md shadow-blue-200">
+            <button id="btn-login" type="submit" onclick="connectMQTT()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-md shadow-blue-200">
                 <span id="btn-login-text">통합 관제 연결</span>
                 <div id="btn-login-spinner" class="spinner hidden"></div>
             </button>
