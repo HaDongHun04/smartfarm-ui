@@ -127,14 +127,15 @@
                         </button>
                     </div>
                 </div>
+
+                <p id="login-error" class="text-red-500 text-xs font-bold mb-4 hidden"></p>
+
+                <button id="btn-login" type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-md shadow-blue-200">
+                    <span id="btn-login-text">통합 관제 연결</span>
+                    <div id="btn-login-spinner" class="spinner hidden"></div>
+                </button>
             </form>
 
-            <p id="login-error" class="text-red-500 text-xs font-bold mb-4 hidden"></p>
-
-            <button id="btn-login" type="submit" onclick="connectMQTT()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-md shadow-blue-200">
-                <span id="btn-login-text">통합 관제 연결</span>
-                <div id="btn-login-spinner" class="spinner hidden"></div>
-            </button>
         </div>
     </div>
 
