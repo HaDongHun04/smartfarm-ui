@@ -172,12 +172,6 @@
                 <div class="w-14 h-9 border border-gray-200 rounded-md flex items-center justify-center text-[8px] font-bold tracking-widest text-gray-500 shadow-inner bg-gray-50">BOX01</div>
                 <div class="flex-1">
                     <h2 class="text-lg font-extrabold tracking-tight">10기 3조 담액식</h2>
-                    <div id="indicators-box01" class="flex flex-wrap gap-2 text-[11px] font-medium text-gray-400 mt-1">
-                        <span id="ind-box01-ch1" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
-                        <span id="ind-box01-ch2" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
-                        <span id="ind-box01-ch3" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
-                        <span id="ind-box01-ch4" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
-                    </div>
                 </div>
             </div>
 
@@ -239,12 +233,6 @@
                 <div class="w-14 h-9 border border-gray-200 rounded-md flex items-center justify-center text-[8px] font-bold tracking-widest text-gray-500 shadow-inner bg-gray-50">BOX02</div>
                 <div class="flex-1">
                     <h2 class="text-lg font-extrabold tracking-tight">스마트팜 10기 3조 분무식</h2>
-                    <div id="indicators-box02" class="flex flex-wrap gap-2 text-[11px] font-medium text-gray-400 mt-1">
-                        <span id="ind-box02-ch1" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
-                        <span id="ind-box02-ch2" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
-                        <span id="ind-box02-ch3" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
-                        <span id="ind-box02-ch4" class="flex items-center"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>OFF</span>
-                    </div>
                 </div>
             </div>
 
@@ -676,7 +664,6 @@
         }
 
         function renderDevice(deviceId) {
-        renderChannelIndicators(deviceId);
         renderChannelButtons(deviceId);
         renderAddChannelOptions(deviceId);
         lucide.createIcons();
