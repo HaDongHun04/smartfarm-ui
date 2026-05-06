@@ -345,8 +345,8 @@
         const allChannels = Array.from({ length: maxChannels }, (_, i) => i + 1);
 
         const deviceStates = {
-        'box01': { online: false, cfgLoaded: false, cfgSeen: {}, channels: {} },
-        'box02': { online: false, cfgLoaded: false, cfgSeen: {}, channels: {} }
+        'box01': { online: false, cfgLoaded: false, cfgSeen: {}, channels: {}, meta: { last_seen: 0, last_connect: 0 } },
+        'box02': { online: false, cfgLoaded: false, cfgSeen: {}, channels: {}, meta: { last_seen: 0, last_connect: 0 } }
         };
 
         const channelColorClasses = ['bg-tuya-blue', 'bg-tuya-green', 'bg-tuya-orange', 'bg-tuya-yellow'];
@@ -396,7 +396,9 @@
         baseTopic + 'state/full',
         baseTopic + 'ch/+/state',
         baseTopic + 'ch/+/cfg',
-        baseTopic + 'meta/online'
+        baseTopic + 'meta/online',
+        baseTopic + 'meta/last_seen',
+        baseTopic + 'meta/last_connect'
         ];
 
         // 구독 신청
@@ -470,10 +472,27 @@
         const data = JSON.parse(payload);
         updateOnlineStatus(deviceId, data.online);
         }
+        else if (topic.endsWith('/meta/last_seen')) {
+        const data = JSON.parse(payload);
+        if (data && typeof data.epoch === 'number') deviceStates[deviceId].meta.last_seen = data.epoch;
+        renderDevice(deviceId);
+        }
+        else if (topic.endsWith('/meta/last_connect')) {
+        const data = JSON.parse(payload);
+        if (data && typeof data.epoch === 'number') deviceStates[deviceId].meta.last_connect = data.epoch;
+        renderDevice(deviceId);
+        }
         } catch (e) {
         logDebug(`❌ JSON 해석 오류: ${e.message}`, 'error');
         }
         });
+        }
+
+        function formatEpoch(epoch) {
+        const n = Number(epoch) || 0;
+        if(!n) return '';
+        const d = new Date(n * 1000);
+        return d.toLocaleString('ko-KR', { hour12: false });
         }
 
         function requestAllStates() {
@@ -790,7 +809,10 @@
         card.classList.add('device-offline');
         badge.classList.remove('bg-gray-500', 'bg-green-500');
         badge.classList.add('bg-red-500');
-        badge.innerText = '오프라인';
+        const lastSeen = deviceStates[deviceId]?.meta?.last_seen || 0;
+        const lastConnect = deviceStates[deviceId]?.meta?.last_connect || 0;
+        const t = formatEpoch(lastSeen || lastConnect);
+        badge.innerText = t ? `오프라인 (${t})` : '오프라인';
         }
         }
 
