@@ -340,19 +340,6 @@
         console.log(msg);
         }
 
-        function tryStoreLogin(username, password) {
-        // 브라우저 "비밀번호 저장" 프롬프트는 SPA/JS 로그인에서 잘 안 뜰 수 있어서,
-        // 지원되는 환경(HTTPS 등)에서는 Credential Management API로 저장을 시도한다.
-        if(!username || !password) return;
-        if(!window.isSecureContext) return;
-        if(!('credentials' in navigator)) return;
-        if(typeof PasswordCredential === 'undefined') return;
-        try {
-        const cred = new PasswordCredential({ id: username, password });
-        navigator.credentials.store(cred);
-        } catch (e) {}
-        }
-
         let client = null;
         const deviceList = ['box01', 'box02'];
         const maxChannels = 12;
@@ -399,7 +386,6 @@
 
         client.on('connect', function () {
         logDebug("✅ 브로커 서버 로그인 성공!");
-        tryStoreLogin(username, password);
         setLoading(false);
         switchToDashboard();
 
