@@ -329,6 +329,7 @@
         }
 
         let client = null;
+        let loginUserId = '';
         const deviceList = ['box01', 'box02'];
         const maxChannels = 12;
         const allChannels = Array.from({ length: maxChannels }, (_, i) => i + 1);
@@ -374,6 +375,7 @@
 
         client.on('connect', function () {
         logDebug("✅ 브로커 서버 로그인 성공!");
+        loginUserId = username;
         setLoading(false);
         switchToDashboard();
 
@@ -538,9 +540,10 @@
         const currentState = deviceStates[deviceId].channels[chNum]?.relay || false;
         const targetCommand = currentState ? "OFF" : "ON";
         const topic = `hdh/${deviceId}/ch/${chNum}/cmd`;
+        const payload = loginUserId ? `${targetCommand} ${loginUserId}` : targetCommand;
 
-        logDebug(`📤 [발신] 제어 명령 -> ${topic} : ${targetCommand}`, 'send');
-        client.publish(topic, targetCommand, { qos: 1, retain: false });
+        logDebug(`📤 [발신] 제어 명령 -> ${topic} : ${payload}`, 'send');
+        client.publish(topic, payload, { qos: 1, retain: false });
 
         // 즉각적인 시각 피드백
         updateChannelUI(deviceId, chNum, !currentState, deviceStates[deviceId].channels[chNum]?.mode || 0);
