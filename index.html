@@ -8,150 +8,106 @@
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
-  * { box-sizing: border-box; }
-  body { font-family: 'Noto Sans KR', sans-serif; background: #0f1117; color: #e2e8f0; -webkit-tap-highlight-color: transparent; user-select: none; }
-  .mono { font-family: 'JetBrains Mono', monospace; }
-
-  /* 로그인 */
-  .login-card { background: #1a1d27; border: 1px solid #2d3149; border-radius: 20px; }
-  .input-field { background: #0f1117; border: 1px solid #2d3149; border-radius: 10px; color: #e2e8f0; padding: 12px 14px; width: 100%; font-size: 13px; outline: none; transition: border-color .2s; }
-  .input-field:focus { border-color: #4ade80; }
-  .btn-primary { background: #4ade80; color: #0f1117; border-radius: 10px; font-weight: 900; padding: 13px; width: 100%; font-size: 14px; cursor: pointer; transition: background .2s, transform .1s; border: none; }
-  .btn-primary:hover { background: #22c55e; }
-  .btn-primary:active { transform: scale(.98); }
-
-  /* 카드 */
-  .device-card { background: #1a1d27; border: 1px solid #2d3149; border-radius: 20px; padding: 20px; }
-  .device-card.offline { opacity: .5; pointer-events: none; filter: grayscale(.6); }
-
-  /* 채널 버튼 */
-  .ch-btn { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
-  .ch-circle { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all .2s; position: relative; }
-  .ch-circle.off { background: #2d3149; }
-  .ch-circle.on  { box-shadow: 0 0 16px currentColor; }
-  .ch-circle:active { transform: scale(.93); }
-  .ch-gear { position: absolute; bottom: -6px; right: -6px; width: 20px; height: 20px; background: #2d3149; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #3d4269; transition: background .15s; z-index: 2; }
-  .ch-gear:hover { background: #4ade80; }
-  .ch-gear:hover svg { color: #0f1117; }
-  .mode-tag { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 10px; white-space: nowrap; pointer-events: none; }
-
-  /* 색상 */
-  .c-green  { color: #4ade80; background-color: #166534; }
-  .c-blue   { color: #60a5fa; background-color: #1e3a5f; }
-  .c-orange { color: #fb923c; background-color: #7c2d12; }
-  .c-purple { color: #a78bfa; background-color: #3b1f6e; }
-  .c-cyan   { color: #22d3ee; background-color: #164e63; }
-  .c-yellow { color: #facc15; background-color: #713f12; }
-
-  /* 온라인 배지 */
-  .badge-online  { background: #166534; color: #4ade80; }
-  .badge-offline { background: #2d3149; color: #64748b; }
-  .badge-wait    { background: #2d3149; color: #94a3b8; }
-
-  /* 스피너 */
-  .spin { animation: spin 1s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* 모달 */
-  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
-  .modal-sheet { background: #1a1d27; border: 1px solid #2d3149; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 24px 20px 40px; }
-  .modal-handle { width: 40px; height: 4px; background: #2d3149; border-radius: 2px; margin: 0 auto 20px; }
-
-  /* 설정 패널 요소 */
-  .setting-row { background: #0f1117; border: 1px solid #2d3149; border-radius: 12px; padding: 14px; margin-bottom: 8px; }
-  .tag-schedule { background: #1e3a5f; color: #60a5fa; }
-  .tag-circulate { background: #166534; color: #4ade80; }
-  .tag-inching { background: #3b1f6e; color: #a78bfa; }
-  .input-sm { background: #0f1117; border: 1px solid #2d3149; border-radius: 8px; color: #e2e8f0; padding: 7px 10px; font-size: 12px; outline: none; width: 100%; }
-  .input-sm:focus { border-color: #4ade80; }
-  .btn-sm { border-radius: 8px; font-weight: 700; font-size: 12px; padding: 7px 14px; cursor: pointer; border: none; transition: background .15s; }
-  .btn-add { background: #4ade80; color: #0f1117; }
-  .btn-add:hover { background: #22c55e; }
-  .btn-del { background: #3f1919; color: #f87171; }
-  .btn-del:hover { background: #5c2020; }
-  .btn-outline { background: transparent; border: 1px solid #2d3149; color: #94a3b8; }
-  .btn-outline:hover { border-color: #4ade80; color: #4ade80; }
-
-  /* 모드 선택 탭 */
-  .mode-tab { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid #2d3149; color: #64748b; background: transparent; transition: all .15s; }
-  .mode-tab.active { background: #4ade80; color: #0f1117; border-color: #4ade80; }
-
-  /* 디버그 콘솔 */
-  #debug-log { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #4ade80; height: 100px; overflow-y: auto; line-height: 1.6; }
-  .log-send { color: #60a5fa; }
-  .log-recv { color: #4ade80; }
-  .log-err  { color: #f87171; }
-  .log-sys  { color: #94a3b8; }
+  body { background:#f0f4f8; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif; -webkit-tap-highlight-color:transparent; user-select:none; }
+  .card { background:#fff; border-radius:24px; padding:20px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+  .input-field { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; color:#1e293b; padding:11px 13px; width:100%; font-size:13px; outline:none; transition:border-color .2s; }
+  .input-field:focus { border-color:#3b82f6; background:#fff; }
+  .btn-primary { background:#3b82f6; color:#fff; border-radius:10px; font-weight:700; padding:13px; width:100%; font-size:14px; cursor:pointer; border:none; transition:background .2s; }
+  .btn-primary:hover { background:#2563eb; }
+  .btn-primary:active { transform:scale(.98); }
+  .ch-btn { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; }
+  .ch-circle { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:all .2s; position:relative; box-shadow:0 2px 6px rgba(0,0,0,.1); }
+  .ch-circle.off { background:#e2e8f0; }
+  .ch-circle.on  { box-shadow:0 4px 14px rgba(0,0,0,.2); }
+  .ch-circle:active { transform:scale(.92); }
+  .ch-gear { position:absolute; bottom:-5px; right:-5px; width:19px; height:19px; background:#fff; border:1.5px solid #e2e8f0; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; box-shadow:0 1px 3px rgba(0,0,0,.1); transition:all .15s; }
+  .ch-gear:hover { background:#3b82f6; border-color:#3b82f6; }
+  .ch-gear:hover .gear-icon { color:#fff; }
+  .mode-tag { position:absolute; top:-9px; left:50%; transform:translateX(-50%); font-size:9px; font-weight:700; padding:2px 6px; border-radius:10px; white-space:nowrap; pointer-events:none; }
+  .mt-sch { background:#dbeafe; color:#1d4ed8; }
+  .mt-cir { background:#d1fae5; color:#065f46; }
+  .mt-inc { background:#ede9fe; color:#5b21b6; }
+  .badge { font-size:9px; font-weight:700; padding:2px 8px; border-radius:20px; }
+  .badge-on  { background:#dcfce7; color:#15803d; }
+  .badge-off { background:#f1f5f9; color:#94a3b8; }
+  .badge-chk { background:#f1f5f9; color:#94a3b8; }
+  .spin { animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .modal-bg { position:fixed; inset:0; background:rgba(15,23,42,.4); backdrop-filter:blur(3px); z-index:50; display:flex; align-items:flex-end; justify-content:center; }
+  .modal-sheet { background:#fff; border-radius:24px 24px 0 0; width:100%; max-width:480px; max-height:88vh; overflow-y:auto; padding:20px 18px 40px; }
+  .modal-handle { width:36px; height:4px; background:#e2e8f0; border-radius:2px; margin:0 auto 18px; }
+  .setting-row { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:8px; }
+  .input-sm { background:#fff; border:1px solid #e2e8f0; border-radius:8px; color:#1e293b; padding:7px 10px; font-size:12px; outline:none; width:100%; transition:border-color .15s; }
+  .input-sm:focus { border-color:#3b82f6; }
+  .btn-sm { border-radius:8px; font-weight:700; font-size:12px; padding:7px 14px; cursor:pointer; border:none; transition:background .15s; }
+  .btn-add { background:#3b82f6; color:#fff; }
+  .btn-add:hover { background:#2563eb; }
+  .btn-del { background:#fee2e2; color:#dc2626; }
+  .btn-del:hover { background:#fecaca; }
+  .mode-tab { padding:7px 13px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; border:1px solid #e2e8f0; color:#94a3b8; background:#fff; transition:all .15s; }
+  .mode-tab.active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+  .device-offline { opacity:.55; filter:grayscale(.5); pointer-events:none; }
+  #debug-log { font-family:Menlo,monospace; font-size:10px; color:#4b5563; height:96px; overflow-y:auto; line-height:1.7; }
+  .ls{color:#2563eb;} .lr{color:#059669;} .le{color:#dc2626;} .lx{color:#94a3b8;}
 </style>
 </head>
 <body class="min-h-screen flex flex-col items-center py-6 px-4">
 
-<!-- ── 로그인 뷰 ─────────────────────────────── -->
+<!-- 로그인 -->
 <div id="login-view" class="w-full max-w-sm">
-  <div class="login-card p-8">
+  <div class="card">
     <div class="text-center mb-6">
-      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-900 mb-3">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l7 7-7 7M12 3l7 7-7 7"/></svg>
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-50 mb-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l7 7-7 7M12 3l7 7-7 7"/></svg>
       </div>
-      <h1 class="text-xl font-black tracking-tight">Smart Farm</h1>
-      <p class="text-xs text-slate-500 mt-1">관리자 계정으로 접속하세요</p>
+      <h1 class="text-xl font-extrabold tracking-tight text-slate-800">Smart Farm</h1>
+      <p class="text-xs text-slate-400 mt-1">관리자 계정으로 접속하세요</p>
     </div>
     <div class="space-y-3">
-      <div>
-        <label class="text-[10px] font-bold text-slate-500 mb-1 block">WebSocket URL</label>
-        <input id="mqtt-url" class="input-field" value="wss://2cda7be527f245e1bfdd99c16a70d52d.s1.eu.hivemq.cloud:8884/mqtt">
-      </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500 mb-1 block">Username</label>
-        <input id="mqtt-username" class="input-field" placeholder="Username">
-      </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500 mb-1 block">Password</label>
-        <input id="mqtt-password" class="input-field" type="password" placeholder="Password">
-      </div>
-      <p id="login-error" class="text-red-400 text-xs font-bold hidden"></p>
+      <div><label class="text-[10px] font-bold text-slate-400 mb-1 block">WebSocket URL</label>
+           <input id="mqtt-url" class="input-field" value="wss://2cda7be527f245e1bfdd99c16a70d52d.s1.eu.hivemq.cloud:8884/mqtt"></div>
+      <div><label class="text-[10px] font-bold text-slate-400 mb-1 block">Username</label>
+           <input id="mqtt-username" class="input-field" placeholder="Username"></div>
+      <div><label class="text-[10px] font-bold text-slate-400 mb-1 block">Password</label>
+           <input id="mqtt-password" class="input-field" type="password" placeholder="Password"></div>
+      <p id="login-error" class="text-red-500 text-xs font-bold hidden"></p>
       <button onclick="connectMQTT()" class="btn-primary flex items-center justify-center gap-2 mt-2">
-        <span id="btn-login-text">연결</span>
+        <span id="btn-login-text">통합 관제 연결</span>
         <svg id="btn-spinner" class="w-4 h-4 spin hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
       </button>
     </div>
   </div>
 </div>
 
-<!-- ── 대시보드 뷰 ────────────────────────────── -->
+<!-- 대시보드 -->
 <div id="dashboard-view" class="w-full max-w-sm hidden flex-col gap-4">
-
-  <!-- 헤더 -->
   <div class="flex items-center justify-between px-1">
     <div>
-      <h1 class="text-lg font-black tracking-tight">통합 관제</h1>
-      <p id="conn-status" class="text-[11px] text-green-400 font-bold mono mt-0.5">● 연결됨</p>
+      <h1 class="text-lg font-extrabold tracking-tight text-slate-800">통합 관제 패널</h1>
+      <p id="conn-status" class="text-[11px] text-blue-500 font-bold mt-0.5">● 서버 접속됨</p>
     </div>
     <div class="flex gap-2">
-      <button onclick="requestAllStates()" class="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:text-green-400 transition-colors">
+      <button onclick="requestAllStates()" title="전체 동기화"
+              class="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-500 transition-colors">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0114.13-1.13M20 15A9 9 0 015.87 16.13"/></svg>
       </button>
-      <button onclick="disconnectMQTT()" class="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:text-red-400 transition-colors">
+      <button onclick="disconnectMQTT()" title="로그아웃"
+              class="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1"/></svg>
       </button>
     </div>
   </div>
-
-  <!-- 기기 카드 컨테이너 -->
   <div id="device-cards"></div>
-
-  <!-- 디버그 콘솔 -->
-  <div class="device-card">
+  <div class="card">
     <div class="flex justify-between items-center mb-2">
-      <span class="text-[10px] font-bold text-slate-500 mono">SYSTEM LOG</span>
-      <button onclick="document.getElementById('debug-log').innerHTML=''" class="text-[10px] text-slate-600 hover:text-slate-400">지우기</button>
+      <span class="text-[10px] font-bold text-slate-400">실시간 통신 로그</span>
+      <button onclick="document.getElementById('debug-log').innerHTML=''" class="text-[10px] text-slate-400 hover:text-slate-600">지우기</button>
     </div>
     <div id="debug-log">대기 중...<br></div>
   </div>
 </div>
 
-<!-- ── 채널 설정 모달 ──────────────────────────── -->
+<!-- 설정 모달 -->
 <div id="cfg-modal" class="modal-bg hidden" onclick="if(event.target===this)closeModal()">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -160,501 +116,316 @@
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════
-//  설정
-// ═══════════════════════════════════════════════════════
-const DEVICE_LIST = ['box01', 'box02'];
-const DEVICE_LABELS = { box01: '10기 3조 담액식', box02: '스마트팜 분무식' };
-const CH_COLORS = ['c-green','c-blue','c-orange','c-purple','c-cyan','c-yellow'];
+const DEVICE_LIST   = ['box01','box02'];
+const DEVICE_LABELS = { box01:'10기 3조 담액식', box02:'스마트팜 분무식' };
+const COL = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#06b6d4','#f43f5e'];
+const state = {}; DEVICE_LIST.forEach(id=>{state[id]={online:false,lastSeen:0,channels:{}};});
+let client=null;
 
-// 상태
-const state = {};
-DEVICE_LIST.forEach(id => {
-  state[id] = { online: false, lastSeen: 0, channels: {} };
-});
+function log(msg,cls='lx'){const el=document.getElementById('debug-log');const t=new Date().toLocaleTimeString('ko',{hour12:false});el.innerHTML+=`<span class="${cls}">[${t}] ${msg}</span><br>`;el.scrollTop=el.scrollHeight;}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function pad2(n){return String(n).padStart(2,'0');}
+function hm(h,m){return`${pad2(h)}:${pad2(m)}`;}
+function secLabel(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),r=s%60;return h>0?`${h}시간 ${m}분`:m>0?`${m}분 ${r}초`:`${r}초`;}
+function chHex(n){return COL[(n-1)%COL.length];}
 
-let client = null;
-
-// ═══════════════════════════════════════════════════════
-//  유틸
-// ═══════════════════════════════════════════════════════
-function log(msg, cls='log-sys') {
-  const el = document.getElementById('debug-log');
-  const time = new Date().toLocaleTimeString('ko',{hour12:false});
-  el.innerHTML += `<span class="${cls}">[${time}] ${msg}</span><br>`;
-  el.scrollTop = el.scrollHeight;
-}
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-function pad2(n) { return String(n).padStart(2,'0'); }
-function hm(h,m) { return `${pad2(h)}:${pad2(m)}`; }
-function parseHM(s) {
-  const [h,m] = s.split(':').map(Number);
-  return { h: h||0, m: m||0 };
-}
-function secToHMS(s) {
-  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), r = s%60;
-  return h>0 ? `${h}시간 ${m}분` : m>0 ? `${m}분 ${r}초` : `${r}초`;
-}
-function chColor(chNum) { return CH_COLORS[(chNum-1) % CH_COLORS.length]; }
-
-// ═══════════════════════════════════════════════════════
-//  MQTT 연결/구독
-// ═══════════════════════════════════════════════════════
-function connectMQTT() {
-  const url  = document.getElementById('mqtt-url').value.trim();
-  const user = document.getElementById('mqtt-username').value.trim();
-  const pass = document.getElementById('mqtt-password').value;
-  const errEl = document.getElementById('login-error');
+// ── MQTT ──
+function connectMQTT(){
+  const url=document.getElementById('mqtt-url').value.trim();
+  const user=document.getElementById('mqtt-username').value.trim();
+  const pass=document.getElementById('mqtt-password').value;
+  const errEl=document.getElementById('login-error');
   errEl.classList.add('hidden');
-  document.getElementById('btn-login-text').textContent = '연결 중...';
+  document.getElementById('btn-login-text').textContent='연결 중...';
   document.getElementById('btn-spinner').classList.remove('hidden');
-
-  client = mqtt.connect(url, { username:user, password:pass, connectTimeout:8000, reconnectPeriod:0 });
-
-  client.on('connect', () => {
+  client=mqtt.connect(url,{username:user,password:pass,connectTimeout:8000,reconnectPeriod:0});
+  client.on('connect',()=>{
     document.getElementById('login-view').classList.add('hidden');
-    document.getElementById('dashboard-view').classList.remove('hidden');
-    document.getElementById('dashboard-view').classList.add('flex');
+    const dv=document.getElementById('dashboard-view');
+    dv.classList.remove('hidden'); dv.classList.add('flex');
     buildDeviceCards();
-
-    DEVICE_LIST.forEach(deviceId => {
-      const base = `hdh/${deviceId}/`;
-      const topics = [
-        base+'state/full', base+'ch/+/state',
-        base+'meta/online', base+'meta/last_seen', base+'meta/last_connect'
-      ];
-      client.subscribe(topics, { qos:1 }, err => {
-        if (err) { log(`❌ 구독 오류: ${err}`, 'log-err'); return; }
-        log(`📡 [${deviceId}] 구독 완료`, 'log-sys');
-        // 단 1번 요청으로 모든 채널 정보 수신
-        client.publish(`hdh/${deviceId}/get/state`, 'GET', { qos:1 });
-        log(`📤 [${deviceId}] get/state 요청`, 'log-send');
+    DEVICE_LIST.forEach(deviceId=>{
+      const base=`hdh/${deviceId}/`;
+      client.subscribe([base+'state/full',base+'ch/+/state',base+'meta/online',base+'meta/last_seen'],{qos:1},err=>{
+        if(err){log(`❌ 구독 오류: ${err}`,'le');return;}
+        log(`📡 [${deviceId}] 구독 완료`);
+        client.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1});
+        log(`📤 [${deviceId}] get/state 요청`,'ls');
       });
     });
   });
-
-  client.on('message', onMessage);
-  client.on('error', err => {
-    errEl.textContent = '연결 실패: ' + err.message;
-    errEl.classList.remove('hidden');
-    document.getElementById('btn-login-text').textContent = '연결';
+  client.on('message',onMessage);
+  client.on('error',err=>{
+    errEl.textContent='연결 실패: '+err.message; errEl.classList.remove('hidden');
+    document.getElementById('btn-login-text').textContent='통합 관제 연결';
     document.getElementById('btn-spinner').classList.add('hidden');
   });
 }
-
-function disconnectMQTT() {
+function disconnectMQTT(){
   client?.end();
-  document.getElementById('dashboard-view').classList.add('hidden');
-  document.getElementById('dashboard-view').classList.remove('flex');
+  const dv=document.getElementById('dashboard-view');
+  dv.classList.add('hidden'); dv.classList.remove('flex');
   document.getElementById('login-view').classList.remove('hidden');
-  document.getElementById('btn-login-text').textContent = '연결';
+  document.getElementById('btn-login-text').textContent='통합 관제 연결';
   document.getElementById('btn-spinner').classList.add('hidden');
 }
 
-// ═══════════════════════════════════════════════════════
-//  메시지 수신
-// ═══════════════════════════════════════════════════════
-function onMessage(topic, buf) {
-  const payload = buf.toString();
-  const parts = topic.split('/');
-  const deviceId = parts[1];
-  if (!DEVICE_LIST.includes(deviceId)) return;
-
-  log(`📥 ${topic.replace(`hdh/${deviceId}/`,'')} ← ${payload.length>80?payload.slice(0,80)+'…':payload}`, 'log-recv');
-
-  try {
-    // state/full : 한 번에 모든 채널 정보
-    if (topic.endsWith('/state/full')) {
-      const data = JSON.parse(payload);
-      (data.ch || []).forEach(ch => {
-        state[deviceId].channels[ch.n] = {
-          ...state[deviceId].channels[ch.n],
-          ...ch
-        };
-      });
-      renderDevice(deviceId);
-      return;
+// ── 메시지 수신 ──
+function onMessage(topic,buf){
+  const payload=buf.toString();
+  const parts=topic.split('/'); const deviceId=parts[1];
+  if(!DEVICE_LIST.includes(deviceId))return;
+  const leaf=topic.replace(`hdh/${deviceId}/`,'');
+  log(`📥 ${leaf} ← ${payload.length>70?payload.slice(0,70)+'…':payload}`,'lr');
+  try{
+    if(topic.endsWith('/state/full')){
+      const data=JSON.parse(payload);
+      (data.ch||[]).forEach(ch=>{state[deviceId].channels[ch.n]={...(state[deviceId].channels[ch.n]||{}),...ch};});
+      renderDevice(deviceId); return;
     }
-    // ch/N/state : 실시간 ON/OFF
-    const chMatch = topic.match(/\/ch\/(\d+)\/state$/);
-    if (chMatch) {
-      const n = parseInt(chMatch[1]);
-      const data = JSON.parse(payload);
-      if (!state[deviceId].channels[n]) state[deviceId].channels[n] = {};
-      state[deviceId].channels[n].relay = data.relay;
-      state[deviceId].channels[n].mode  = data.mode;
-      renderChannelBtn(deviceId, n);
-      return;
+    const m=topic.match(/\/ch\/(\d+)\/state$/);
+    if(m){
+      const n=parseInt(m[1]),d=JSON.parse(payload);
+      state[deviceId].channels[n]={...(state[deviceId].channels[n]||{}),relay:d.relay,mode:d.mode};
+      renderChBtn(deviceId,n); return;
     }
-    // meta/online
-    if (topic.endsWith('/meta/online')) {
-      const data = JSON.parse(payload);
-      setOnline(deviceId, !!data.online);
-      return;
+    if(topic.endsWith('/meta/online')){setOnline(deviceId,!!JSON.parse(payload).online);return;}
+    if(topic.endsWith('/meta/last_seen')){
+      state[deviceId].lastSeen=JSON.parse(payload).epoch;
+      const el=document.getElementById(`meta-${deviceId}`);
+      if(el)el.textContent='최근: '+new Date(state[deviceId].lastSeen*1000).toLocaleString('ko',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
     }
-    // meta/last_seen
-    if (topic.endsWith('/meta/last_seen')) {
-      const data = JSON.parse(payload);
-      state[deviceId].lastSeen = data.epoch;
-      renderDeviceMeta(deviceId);
-      return;
-    }
-  } catch(e) { log(`⚠️ JSON 파싱 오류: ${e.message}`, 'log-err'); }
+  }catch(e){log(`⚠️ JSON 오류: ${e.message}`,'le');}
 }
+function requestAllStates(){DEVICE_LIST.forEach(id=>{client?.publish(`hdh/${id}/get/state`,'GET',{qos:1});log(`📤 [${id}] get/state 재요청`,'ls');});}
 
-// ═══════════════════════════════════════════════════════
-//  전체 상태 요청
-// ═══════════════════════════════════════════════════════
-function requestAllStates() {
-  DEVICE_LIST.forEach(deviceId => {
-    client?.publish(`hdh/${deviceId}/get/state`, 'GET', { qos:1 });
-    log(`📤 [${deviceId}] get/state 재요청`, 'log-send');
-  });
-}
-
-// ═══════════════════════════════════════════════════════
-//  기기 카드 생성 (최초 1회)
-// ═══════════════════════════════════════════════════════
-function buildDeviceCards() {
-  const wrap = document.getElementById('device-cards');
-  wrap.innerHTML = DEVICE_LIST.map(id => `
-    <div id="card-${id}" class="device-card mb-4">
+// ── 카드 생성 ──
+function buildDeviceCards(){
+  document.getElementById('device-cards').innerHTML=DEVICE_LIST.map(id=>`
+    <div id="card-${id}" class="card mb-4">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
-          <span class="mono text-[10px] font-bold text-slate-500 bg-slate-800 px-2 py-1 rounded">${id.toUpperCase()}</span>
+          <span class="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-md tracking-widest">${id.toUpperCase()}</span>
           <div>
-            <p class="text-sm font-bold leading-tight">${esc(DEVICE_LABELS[id]||id)}</p>
-            <p id="meta-${id}" class="text-[10px] text-slate-500 mono mt-0.5">—</p>
+            <p class="text-sm font-extrabold text-slate-800 leading-tight">${esc(DEVICE_LABELS[id]||id)}</p>
+            <p id="meta-${id}" class="text-[10px] text-slate-400 mt-0.5">—</p>
           </div>
         </div>
-        <span id="badge-${id}" class="text-[9px] font-bold px-2 py-0.5 rounded-full badge-wait">확인 중</span>
+        <span id="badge-${id}" class="badge badge-chk">확인 중</span>
       </div>
       <div id="channels-${id}" class="grid grid-cols-3 gap-4 min-h-[72px]">
-        <div class="col-span-3 text-center text-xs text-slate-600 py-4">상태 조회 중...</div>
+        <div class="col-span-3 text-center text-xs text-slate-400 py-4">상태 조회 중...</div>
       </div>
-      <!-- 채널 추가 -->
-      <div class="mt-4 pt-4 border-t border-slate-800">
+      <div class="mt-4 pt-4 border-t border-slate-100">
         <div class="grid grid-cols-2 gap-2">
-          <input id="add-name-${id}" class="input-sm" placeholder="채널 이름">
-          <input id="add-pin-${id}"  class="input-sm" type="number" min="0" max="127" placeholder="GPIO Pin">
-          <select id="add-ch-${id}" class="input-sm col-span-1">
+          <input id="add-name-${id}" class="input-field text-xs" placeholder="채널 이름">
+          <input id="add-pin-${id}"  class="input-field text-xs" type="number" min="0" max="127" placeholder="GPIO Pin">
+          <select id="add-ch-${id}" class="input-field text-xs">
             ${Array.from({length:12},(_,i)=>`<option value="${i+1}">CH${i+1}</option>`).join('')}
           </select>
           <button onclick="addChannel('${id}')" class="btn-sm btn-add">+ 추가</button>
         </div>
-        <p id="add-err-${id}" class="text-red-400 text-[10px] font-bold mt-1 hidden"></p>
+        <p id="add-err-${id}" class="text-red-500 text-[10px] font-bold mt-1 hidden"></p>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-// ═══════════════════════════════════════════════════════
-//  렌더링
-// ═══════════════════════════════════════════════════════
-function renderDevice(deviceId) {
-  const chs = state[deviceId].channels;
-  const named = Object.keys(chs).map(Number).filter(n => chs[n]?.name?.trim()).sort((a,b)=>a-b);
-  const wrap = document.getElementById(`channels-${deviceId}`);
-  if (!wrap) return;
-
-  if (named.length === 0) {
-    wrap.innerHTML = '<div class="col-span-3 text-center text-xs text-slate-600 py-4">이름이 설정된 채널이 없습니다</div>';
-  } else {
-    wrap.innerHTML = named.map(n => channelBtnHTML(deviceId, n)).join('');
-  }
-  // 추가 셀렉트 갱신
-  const sel = document.getElementById(`add-ch-${deviceId}`);
-  if (sel) {
-    const used = new Set(named);
-    sel.innerHTML = Array.from({length:12},(_,i)=>i+1)
-      .filter(n=>!used.has(n))
-      .map(n=>`<option value="${n}">CH${n}</option>`).join('');
-  }
+// ── 렌더링 ──
+function renderDevice(deviceId){
+  const chs=state[deviceId].channels;
+  const named=Object.keys(chs).map(Number).filter(n=>chs[n]?.name?.trim()).sort((a,b)=>a-b);
+  const wrap=document.getElementById(`channels-${deviceId}`);
+  if(!wrap)return;
+  wrap.innerHTML=named.length===0
+    ?'<div class="col-span-3 text-center text-xs text-slate-400 py-4">이름이 설정된 채널이 없습니다</div>'
+    :named.map(n=>chBtnHTML(deviceId,n)).join('');
+  const sel=document.getElementById(`add-ch-${deviceId}`);
+  if(sel){const used=new Set(named);sel.innerHTML=Array.from({length:12},(_,i)=>i+1).filter(n=>!used.has(n)).map(n=>`<option value="${n}">CH${n}</option>`).join('');}
   lucide.createIcons();
 }
 
-function channelBtnHTML(deviceId, chNum) {
-  const ch = state[deviceId].channels[chNum] || {};
-  const on = !!ch.relay;
-  const mode = Number(ch.mode)||0;
-  const col = chColor(chNum);
-  const modeLabels = ['','스케줄','순환','인칭'];
-  const modeTagCls = ['','tag-schedule','tag-circulate','tag-inching'];
-
+function chBtnHTML(deviceId,chNum){
+  const ch=state[deviceId].channels[chNum]||{};
+  const on=!!ch.relay, mode=Number(ch.mode)||0;
+  const hex=chHex(chNum);
+  const bg=on?`background:${hex}`:'';
+  const mtag=['','mt-sch','mt-cir','mt-inc'][mode]||'';
+  const mlbl=['','스케줄','순환','인칭'][mode]||'';
   return `
   <div class="ch-btn" id="chbtn-${deviceId}-${chNum}">
-    ${mode>0?`<span class="mode-tag ${modeTagCls[mode]||''}">${modeLabels[mode]||''}</span>`:''}
-    <div class="ch-circle ${on?'on':'off'} ${on?col:''}"
-         onclick="toggleChannel('${deviceId}',${chNum})"
-         style="${on?`color:var(--tw-prose-bold,currentColor)`:''}">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="${on?`color:${colHex(col)}`:'color:#64748b'}">
+    ${mode>0?`<span class="mode-tag ${mtag}">${mlbl}</span>`:''}
+    <div class="ch-circle ${on?'on':'off'}" style="${bg}" onclick="toggleChannel('${deviceId}',${chNum})">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:${on?'#fff':'#94a3b8'}">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v4M6.34 6.34l2.83 2.83M3 12h4M6.34 17.66l2.83-2.83M12 17v4M17.66 17.66l-2.83-2.83M21 12h-4M17.66 6.34l-2.83 2.83"/>
       </svg>
       <span class="ch-gear" onclick="event.stopPropagation();openCfg('${deviceId}',${chNum})">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="w-3 h-3 gear-icon" style="color:#94a3b8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
           <circle cx="12" cy="12" r="3"/>
         </svg>
       </span>
     </div>
-    <span class="text-[11px] font-bold text-center leading-tight" style="color:${on?colHex(col):'#64748b'}">${esc(ch.name||'CH'+chNum)}<br><span class="text-[9px] text-slate-600 font-normal">CH${chNum}</span></span>
+    <span class="text-[11px] font-bold text-center leading-tight" style="color:${on?hex:'#64748b'}">
+      ${esc(ch.name||'CH'+chNum)}<br><span class="text-[9px] text-slate-400 font-normal">CH${chNum}</span>
+    </span>
   </div>`;
 }
-
-function renderChannelBtn(deviceId, chNum) {
-  const el = document.getElementById(`chbtn-${deviceId}-${chNum}`);
-  if (!el) return;
-  el.outerHTML = channelBtnHTML(deviceId, chNum);
-  lucide.createIcons();
+function renderChBtn(deviceId,chNum){const el=document.getElementById(`chbtn-${deviceId}-${chNum}`);if(el){el.outerHTML=chBtnHTML(deviceId,chNum);lucide.createIcons();}}
+function setOnline(deviceId,online){
+  state[deviceId].online=online;
+  const card=document.getElementById(`card-${deviceId}`);
+  const badge=document.getElementById(`badge-${deviceId}`);
+  if(!card||!badge)return;
+  card.classList.toggle('device-offline',!online);
+  badge.className='badge '+(online?'badge-on':'badge-off');
+  badge.textContent=online?'온라인':'오프라인';
 }
 
-function renderDeviceMeta(deviceId) {
-  const el = document.getElementById(`meta-${deviceId}`);
-  if (!el) return;
-  const ts = state[deviceId].lastSeen;
-  el.textContent = ts ? '최근: ' + new Date(ts*1000).toLocaleString('ko',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+// ── 채널 토글 ──
+function toggleChannel(deviceId,chNum){
+  if(!client?.connected)return;
+  const ch=state[deviceId].channels[chNum];
+  const payload=ch?.relay?'OFF':'ON';
+  client.publish(`hdh/${deviceId}/ch/${chNum}/cmd`,payload,{qos:1});
+  log(`📤 ${deviceId}/ch/${chNum}/cmd → ${payload}`,'ls');
+  state[deviceId].channels[chNum]={...(ch||{}),relay:!ch?.relay};
+  renderChBtn(deviceId,chNum);
 }
 
-function setOnline(deviceId, online) {
-  state[deviceId].online = online;
-  const card  = document.getElementById(`card-${deviceId}`);
-  const badge = document.getElementById(`badge-${deviceId}`);
-  if (!card || !badge) return;
-  if (online) {
-    card.classList.remove('offline');
-    badge.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full badge-online';
-    badge.textContent = '온라인';
-  } else {
-    card.classList.add('offline');
-    badge.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full badge-offline';
-    badge.textContent = '오프라인';
-  }
-}
-
-function colHex(cls) {
-  const map = { 'c-green':'#4ade80','c-blue':'#60a5fa','c-orange':'#fb923c','c-purple':'#a78bfa','c-cyan':'#22d3ee','c-yellow':'#facc15' };
-  return map[cls]||'#60a5fa';
-}
-
-// ═══════════════════════════════════════════════════════
-//  채널 토글
-// ═══════════════════════════════════════════════════════
-function toggleChannel(deviceId, chNum) {
-  if (!client?.connected) return;
-  const ch = state[deviceId].channels[chNum];
-  const topic = `hdh/${deviceId}/ch/${chNum}/cmd`;
-  const payload = ch?.relay ? 'OFF' : 'ON';
-  client.publish(topic, payload, { qos:1 });
-  log(`📤 ${deviceId}/ch/${chNum}/cmd → ${payload}`, 'log-send');
-  // 낙관적 업데이트
-  if (!state[deviceId].channels[chNum]) state[deviceId].channels[chNum] = {};
-  state[deviceId].channels[chNum].relay = !ch?.relay;
-  renderChannelBtn(deviceId, chNum);
-}
-
-// ═══════════════════════════════════════════════════════
-//  채널 추가
-// ═══════════════════════════════════════════════════════
-function addChannel(deviceId) {
-  const name = document.getElementById(`add-name-${deviceId}`).value.trim();
-  const pin  = parseInt(document.getElementById(`add-pin-${deviceId}`).value);
-  const chNum= parseInt(document.getElementById(`add-ch-${deviceId}`).value);
-  const errEl= document.getElementById(`add-err-${deviceId}`);
-  const setErr = msg => { errEl.textContent = msg; errEl.classList.toggle('hidden', !msg); };
+// ── 채널 추가 ──
+function addChannel(deviceId){
+  const name=document.getElementById(`add-name-${deviceId}`).value.trim();
+  const pin=parseInt(document.getElementById(`add-pin-${deviceId}`).value);
+  const chNum=parseInt(document.getElementById(`add-ch-${deviceId}`).value);
+  const errEl=document.getElementById(`add-err-${deviceId}`);
+  const setErr=m=>{errEl.textContent=m;errEl.classList.toggle('hidden',!m);};
   setErr('');
-  if (!name) return setErr('채널 이름을 입력하세요.');
-  if (/\s/.test(name)) return setErr('이름에 공백 불가.');
-  if (new TextEncoder().encode(name).length > 15) return setErr('이름은 15바이트 이하.');
-  if (!Number.isInteger(pin)||pin<0||pin>127) return setErr('GPIO Pin: 0~127');
-
-  client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,  `${pin} 1 0`, { qos:1 });
-  client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/name`, name,          { qos:1 });
-  log(`📤 CH${chNum} 추가: ${name} pin=${pin}`, 'log-send');
-
-  if (!state[deviceId].channels[chNum]) state[deviceId].channels[chNum] = {};
-  Object.assign(state[deviceId].channels[chNum], { name, pin, lvl:1, init:0, mode:0, relay:false, schedule:[], circulate:[] });
+  if(!name)return setErr('채널 이름을 입력하세요.');
+  if(/\s/.test(name))return setErr('이름에 공백 불가.');
+  if(new TextEncoder().encode(name).length>15)return setErr('이름은 UTF-8 15바이트 이하.');
+  if(!Number.isInteger(pin)||pin<0||pin>127)return setErr('GPIO Pin: 0~127');
+  client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,`${pin} 1 0`,{qos:1});
+  client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/name`,name,{qos:1});
+  log(`📤 CH${chNum} 추가: ${name} (pin=${pin})`,'ls');
+  state[deviceId].channels[chNum]={name,pin,lvl:1,init:0,mode:0,relay:false,schedule:[],circulate:[]};
   renderDevice(deviceId);
-  document.getElementById(`add-name-${deviceId}`).value = '';
-  document.getElementById(`add-pin-${deviceId}`).value  = '';
-
-  // 아두이노에서 최신 cfg 재수신
-  setTimeout(() => {
-    client.publish(`hdh/${deviceId}/get/state`, 'GET', { qos:1 });
-  }, 600);
+  document.getElementById(`add-name-${deviceId}`).value='';
+  document.getElementById(`add-pin-${deviceId}`).value='';
+  setTimeout(()=>client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}),600);
 }
 
-// ═══════════════════════════════════════════════════════
-//  채널 설정 모달
-// ═══════════════════════════════════════════════════════
-let _modalCtx = null; // { deviceId, chNum }
-
-function openCfg(deviceId, chNum) {
-  _modalCtx = { deviceId, chNum };
-  renderModal();
-  document.getElementById('cfg-modal').classList.remove('hidden');
-}
-
-function closeModal() {
-  document.getElementById('cfg-modal').classList.add('hidden');
-  _modalCtx = null;
-}
-
-function renderModal() {
-  if (!_modalCtx) return;
-  const { deviceId, chNum } = _modalCtx;
-  const ch = state[deviceId].channels[chNum] || {};
-  const mode = Number(ch.mode)||0;
-  const modeNames = ['수동','스케줄','순환','인칭'];
-
-  let detailHTML = '';
-  if (mode === 1) detailHTML = renderScheduleCfg(deviceId, chNum, ch);
-  else if (mode === 2) detailHTML = renderCirculateCfg(deviceId, chNum, ch);
-  else if (mode === 3) detailHTML = renderInchingCfg(deviceId, chNum, ch);
-  else detailHTML = `<p class="text-xs text-slate-500 text-center py-3">수동 모드 — 버튼으로 직접 ON/OFF 제어</p>`;
-
-  document.getElementById('modal-content').innerHTML = `
+// ── 설정 모달 ──
+let _ctx=null;
+function openCfg(deviceId,chNum){_ctx={deviceId,chNum};renderModal();document.getElementById('cfg-modal').classList.remove('hidden');}
+function closeModal(){document.getElementById('cfg-modal').classList.add('hidden');_ctx=null;}
+function renderModal(){
+  if(!_ctx)return;
+  const {deviceId,chNum}=_ctx;
+  const ch=state[deviceId].channels[chNum]||{};
+  const mode=Number(ch.mode)||0;
+  const mN=['수동','스케줄','순환','인칭'];
+  const detail=mode===1?schUI(deviceId,chNum,ch):mode===2?cirUI(deviceId,chNum,ch):mode===3?inchUI(deviceId,chNum,ch)
+    :`<p class="text-xs text-slate-400 text-center py-3">수동 모드 — 버튼으로 직접 ON/OFF 제어합니다.</p>`;
+  const hex=chHex(chNum);
+  document.getElementById('modal-content').innerHTML=`
     <div class="flex items-center gap-3 mb-5">
-      <div class="w-9 h-9 rounded-full flex items-center justify-center ${chColor(chNum)}" style="background:${colHex(chColor(chNum))}22">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:${colHex(chColor(chNum))}">
+      <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background:${hex}22">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:${hex}">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v4M6.34 6.34l2.83 2.83M3 12h4M6.34 17.66l2.83-2.83M12 17v4M17.66 17.66l-2.83-2.83M21 12h-4M17.66 6.34l-2.83 2.83"/>
         </svg>
       </div>
       <div>
-        <p class="font-bold">${esc(ch.name||'CH'+chNum)} <span class="text-slate-500 text-xs font-normal">CH${chNum}</span></p>
-        <p class="text-[11px] text-slate-500">현재 ${modeNames[mode]} 모드</p>
+        <p class="font-bold text-slate-800">${esc(ch.name||'CH'+chNum)} <span class="text-slate-400 text-xs font-normal">CH${chNum}</span></p>
+        <p class="text-[11px] text-slate-400">현재 ${mN[mode]} 모드</p>
       </div>
     </div>
-
-    <!-- 모드 선택 -->
-    <div class="flex gap-2 mb-4 flex-wrap">
-      ${[0,1,2,3].map(m=>`<button class="mode-tab ${mode===m?'active':''}" onclick="setMode('${deviceId}',${chNum},${m})">${modeNames[m]}</button>`).join('')}
+    <div class="flex gap-2 flex-wrap mb-4">
+      ${[0,1,2,3].map(m=>`<button class="mode-tab${mode===m?' active':''}" onclick="setMode('${deviceId}',${chNum},${m})">${mN[m]}</button>`).join('')}
     </div>
-
-    <!-- 모드별 상세 설정 -->
-    <div id="modal-detail">${detailHTML}</div>
-  `;
+    <div id="modal-detail">${detail}</div>`;
+}
+function setMode(deviceId,chNum,m){
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/mode`,String(m),{qos:1});
+  log(`📤 ${deviceId}/ch/${chNum}/mode → ${m}`,'ls');
+  state[deviceId].channels[chNum]={...(state[deviceId].channels[chNum]||{}),mode:m};
+  renderModal(); renderChBtn(deviceId,chNum);
 }
 
-function setMode(deviceId, chNum, newMode) {
-  client?.publish(`hdh/${deviceId}/ch/${chNum}/mode`, String(newMode), { qos:1 });
-  log(`📤 ${deviceId}/ch/${chNum}/mode → ${newMode}`, 'log-send');
-  if (!state[deviceId].channels[chNum]) state[deviceId].channels[chNum] = {};
-  state[deviceId].channels[chNum].mode = newMode;
-  renderModal();
-  renderChannelBtn(deviceId, chNum);
+// ── 스케줄 ──
+function schUI(deviceId,chNum,ch){
+  const list=ch.schedule||[];
+  return`${list.length===0?'<p class="text-xs text-slate-400 mb-3 text-center">등록된 스케줄 없음</p>'
+    :list.map(s=>`<div class="setting-row flex items-center gap-2"><span class="text-[11px] text-slate-600 flex-1">${hm(s.onH,s.onM)} → ${hm(s.offH,s.offM)} <span class="text-slate-400 text-[9px]">mask:${s.mask}</span></span><button class="btn-sm btn-del" onclick="delSch('${deviceId}',${chNum},${s.id})">삭제</button></div>`).join('')}
+  <div class="setting-row mt-2">
+    <p class="text-[10px] font-bold text-slate-500 mb-2">새 스케줄 추가</p>
+    <div class="grid grid-cols-2 gap-2 mb-2">
+      <div><label class="text-[9px] text-slate-400">켜는 시각</label><input id="so-${chNum}" class="input-sm" type="time" value="09:00"></div>
+      <div><label class="text-[9px] text-slate-400">끄는 시각</label><input id="sf-${chNum}" class="input-sm" type="time" value="18:00"></div>
+    </div>
+    <div class="mb-2"><label class="text-[9px] text-slate-400">요일 mask (127=매일)</label><input id="sm-${chNum}" class="input-sm" type="number" min="0" max="127" value="127"></div>
+    <button class="btn-sm btn-add w-full" onclick="addSch('${deviceId}',${chNum})">스케줄 추가</button>
+  </div>`;
 }
-
-// ── 스케줄 설정 UI ──────────────────────────────────
-function renderScheduleCfg(deviceId, chNum, ch) {
-  const list = ch.schedule || [];
-  const rows = list.map(s => `
-    <div class="setting-row flex items-center gap-2">
-      <span class="text-[10px] mono text-slate-400 flex-1">${hm(s.onH,s.onM)} → ${hm(s.offH,s.offM)} <span class="text-slate-600">mask:${s.mask}</span></span>
-      <button class="btn-sm btn-del" onclick="delSchedule('${deviceId}',${chNum},${s.id})">삭제</button>
-    </div>`).join('');
-
-  return `
-    ${list.length===0?'<p class="text-xs text-slate-600 mb-3 text-center">등록된 스케줄 없음</p>':rows}
-    <div class="setting-row mt-2">
-      <p class="text-[10px] font-bold text-slate-400 mb-2">새 스케줄 추가</p>
-      <div class="grid grid-cols-2 gap-2 mb-2">
-        <div><label class="text-[9px] text-slate-600">켜는 시각</label><input id="sch-on-${chNum}"  class="input-sm" type="time" value="09:00"></div>
-        <div><label class="text-[9px] text-slate-600">끄는 시각</label><input id="sch-off-${chNum}" class="input-sm" type="time" value="18:00"></div>
-      </div>
-      <div class="mb-2"><label class="text-[9px] text-slate-600">요일 (127=매일)</label><input id="sch-mask-${chNum}" class="input-sm" type="number" min="0" max="127" value="127"></div>
-      <button class="btn-sm btn-add w-full" onclick="addSchedule('${deviceId}',${chNum})">스케줄 추가</button>
-    </div>`;
+function addSch(deviceId,chNum){
+  const p=`${document.getElementById(`so-${chNum}`).value} ${document.getElementById(`sf-${chNum}`).value} ${document.getElementById(`sm-${chNum}`).value}`;
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/schedule`,p,{qos:1});
+  log(`📤 schedule CH${chNum}: ${p}`,'ls');
+  setTimeout(()=>client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}),400);
+  setTimeout(renderModal,550);
 }
-
-function addSchedule(deviceId, chNum) {
-  const on   = document.getElementById(`sch-on-${chNum}`)?.value  || '09:00';
-  const off  = document.getElementById(`sch-off-${chNum}`)?.value || '18:00';
-  const mask = document.getElementById(`sch-mask-${chNum}`)?.value || '127';
-  const topic = `hdh/${deviceId}/ch/${chNum}/schedule`;
-  const payload = `${on} ${off} ${mask}`;
-  client?.publish(topic, payload, { qos:1 });
-  log(`📤 schedule ${chNum}: ${payload}`, 'log-send');
-  setTimeout(() => { client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}); }, 400);
-  setTimeout(renderModal, 500);
-}
-
-function delSchedule(deviceId, chNum, id) {
-  client?.publish(`hdh/${deviceId}/ch/${chNum}/schedule/del`, String(id), { qos:1 });
-  log(`📤 schedule_del CH${chNum} id=${id}`, 'log-send');
-  const ch = state[deviceId].channels[chNum];
-  if (ch?.schedule) ch.schedule = ch.schedule.filter(s=>s.id!==id);
+function delSch(deviceId,chNum,id){
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/schedule/del`,String(id),{qos:1});
+  log(`📤 schedule/del CH${chNum} id=${id}`,'ls');
+  const ch=state[deviceId].channels[chNum];
+  if(ch?.schedule)ch.schedule=ch.schedule.filter(s=>s.id!==id);
   renderModal();
 }
 
-// ── 순환 설정 UI ──────────────────────────────────
-function renderCirculateCfg(deviceId, chNum, ch) {
-  const list = ch.circulate || [];
-  const rows = list.map(c => `
-    <div class="setting-row flex items-start gap-2">
-      <div class="flex-1">
-        <p class="text-[10px] mono text-slate-300">${hm(c.startH,c.startM)} ~ ${hm(c.endH,c.endM)}</p>
-        <p class="text-[9px] text-slate-500">ON ${secToHMS(c.open)} / OFF ${secToHMS(c.close)} · mask:${c.mask}</p>
-      </div>
-      <button class="btn-sm btn-del" onclick="delCirculate('${deviceId}',${chNum},${c.id})">삭제</button>
-    </div>`).join('');
-
-  return `
-    ${list.length===0?'<p class="text-xs text-slate-600 mb-3 text-center">등록된 순환 없음</p>':rows}
-    <div class="setting-row mt-2">
-      <p class="text-[10px] font-bold text-slate-400 mb-2">새 순환 추가</p>
-      <div class="grid grid-cols-2 gap-2 mb-2">
-        <div><label class="text-[9px] text-slate-600">시작 시각</label><input id="cir-s-${chNum}"  class="input-sm" type="time" value="09:00"></div>
-        <div><label class="text-[9px] text-slate-600">종료 시각</label><input id="cir-e-${chNum}"  class="input-sm" type="time" value="18:00"></div>
-        <div><label class="text-[9px] text-slate-600">ON 시간 (초)</label><input id="cir-on-${chNum}" class="input-sm" type="number" value="60"></div>
-        <div><label class="text-[9px] text-slate-600">OFF 시간 (초)</label><input id="cir-off-${chNum}" class="input-sm" type="number" value="1140"></div>
-      </div>
-      <div class="mb-2"><label class="text-[9px] text-slate-600">요일 mask</label><input id="cir-mask-${chNum}" class="input-sm" type="number" min="0" max="127" value="127"></div>
-      <button class="btn-sm btn-add w-full" onclick="addCirculate('${deviceId}',${chNum})">순환 추가</button>
-    </div>`;
+// ── 순환 ──
+function cirUI(deviceId,chNum,ch){
+  const list=ch.circulate||[];
+  return`${list.length===0?'<p class="text-xs text-slate-400 mb-3 text-center">등록된 순환 없음</p>'
+    :list.map(c=>`<div class="setting-row flex items-start gap-2"><div class="flex-1"><p class="text-[11px] text-slate-700">${hm(c.startH,c.startM)} ~ ${hm(c.endH,c.endM)}</p><p class="text-[9px] text-slate-400">ON ${secLabel(c.open)} / OFF ${secLabel(c.close)} · mask:${c.mask}</p></div><button class="btn-sm btn-del" onclick="delCir('${deviceId}',${chNum},${c.id})">삭제</button></div>`).join('')}
+  <div class="setting-row mt-2">
+    <p class="text-[10px] font-bold text-slate-500 mb-2">새 순환 추가</p>
+    <div class="grid grid-cols-2 gap-2 mb-2">
+      <div><label class="text-[9px] text-slate-400">시작 시각</label><input id="cs-${chNum}" class="input-sm" type="time" value="09:00"></div>
+      <div><label class="text-[9px] text-slate-400">종료 시각</label><input id="ce-${chNum}" class="input-sm" type="time" value="18:00"></div>
+      <div><label class="text-[9px] text-slate-400">ON 시간(초)</label><input id="con-${chNum}" class="input-sm" type="number" value="60"></div>
+      <div><label class="text-[9px] text-slate-400">OFF 시간(초)</label><input id="cof-${chNum}" class="input-sm" type="number" value="1140"></div>
+    </div>
+    <div class="mb-2"><label class="text-[9px] text-slate-400">요일 mask</label><input id="cm-${chNum}" class="input-sm" type="number" min="0" max="127" value="127"></div>
+    <button class="btn-sm btn-add w-full" onclick="addCir('${deviceId}',${chNum})">순환 추가</button>
+  </div>`;
 }
-
-function addCirculate(deviceId, chNum) {
-  const s    = document.getElementById(`cir-s-${chNum}`)?.value   || '09:00';
-  const e    = document.getElementById(`cir-e-${chNum}`)?.value   || '18:00';
-  const on   = document.getElementById(`cir-on-${chNum}`)?.value  || '60';
-  const off  = document.getElementById(`cir-off-${chNum}`)?.value || '1140';
-  const mask = document.getElementById(`cir-mask-${chNum}`)?.value|| '127';
-  const payload = `${s} ${e} ${on} ${off} ${mask}`;
-  client?.publish(`hdh/${deviceId}/ch/${chNum}/circulate`, payload, { qos:1 });
-  log(`📤 circulate CH${chNum}: ${payload}`, 'log-send');
-  setTimeout(() => { client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}); }, 400);
-  setTimeout(renderModal, 500);
+function addCir(deviceId,chNum){
+  const p=`${document.getElementById(`cs-${chNum}`).value} ${document.getElementById(`ce-${chNum}`).value} ${document.getElementById(`con-${chNum}`).value} ${document.getElementById(`cof-${chNum}`).value} ${document.getElementById(`cm-${chNum}`).value}`;
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/circulate`,p,{qos:1});
+  log(`📤 circulate CH${chNum}: ${p}`,'ls');
+  setTimeout(()=>client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}),400);
+  setTimeout(renderModal,550);
 }
-
-function delCirculate(deviceId, chNum, id) {
-  client?.publish(`hdh/${deviceId}/ch/${chNum}/circulate/del`, String(id), { qos:1 });
-  log(`📤 circulate_del CH${chNum} id=${id}`, 'log-send');
-  const ch = state[deviceId].channels[chNum];
-  if (ch?.circulate) ch.circulate = ch.circulate.filter(c=>c.id!==id);
+function delCir(deviceId,chNum,id){
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/circulate/del`,String(id),{qos:1});
+  log(`📤 circulate/del CH${chNum} id=${id}`,'ls');
+  const ch=state[deviceId].channels[chNum];
+  if(ch?.circulate)ch.circulate=ch.circulate.filter(c=>c.id!==id);
   renderModal();
 }
 
-// ── 인칭 설정 UI ──────────────────────────────────
-function renderInchingCfg(deviceId, chNum, ch) {
-  const sec = Number(ch.inching)||0;
-  return `
-    <div class="setting-row">
-      <p class="text-[10px] text-slate-400 mb-2">ON 명령 후 자동 OFF 시간</p>
-      <p class="text-xs text-slate-300 mb-3">현재: <span class="font-bold text-purple-400">${sec}초</span></p>
-      <div class="flex gap-2">
-        <input id="inch-sec-${chNum}" class="input-sm" type="number" min="1" value="${sec||5}" placeholder="초">
-        <button class="btn-sm btn-add" onclick="setInching('${deviceId}',${chNum})">적용</button>
-      </div>
-    </div>`;
+// ── 인칭 ──
+function inchUI(deviceId,chNum,ch){
+  const sec=Number(ch.inching)||0;
+  return`<div class="setting-row"><p class="text-[10px] text-slate-500 mb-1">ON 명령 후 자동 OFF 시간</p>
+    <p class="text-xs text-slate-700 mb-3">현재: <span class="font-bold" style="color:#8b5cf6">${sec}초</span></p>
+    <div class="flex gap-2"><input id="is-${chNum}" class="input-sm" type="number" min="1" value="${sec||5}">
+    <button class="btn-sm btn-add" onclick="setInch('${deviceId}',${chNum})">적용</button></div></div>`;
 }
-
-function setInching(deviceId, chNum) {
-  const sec = document.getElementById(`inch-sec-${chNum}`)?.value || '5';
-  client?.publish(`hdh/${deviceId}/ch/${chNum}/inching`, sec, { qos:1 });
-  log(`📤 inching CH${chNum}: ${sec}초`, 'log-send');
-  if (state[deviceId].channels[chNum]) state[deviceId].channels[chNum].inching = Number(sec);
+function setInch(deviceId,chNum){
+  const sec=document.getElementById(`is-${chNum}`)?.value||'5';
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/inching`,sec,{qos:1});
+  log(`📤 inching CH${chNum}: ${sec}초`,'ls');
+  if(state[deviceId].channels[chNum])state[deviceId].channels[chNum].inching=Number(sec);
   renderModal();
 }
 </script>
