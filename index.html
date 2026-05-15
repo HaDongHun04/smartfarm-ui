@@ -16,14 +16,14 @@
   .btn-primary:hover { background:#2563eb; }
   .btn-primary:active { transform:scale(.98); }
   .ch-btn { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; }
-  .ch-circle { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:all .2s; position:relative; box-shadow:0 2px 6px rgba(0,0,0,.1); }
+  .ch-circle { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:all .2s; position:relative; box-shadow:0 2px 6px rgba(0,0,0,.1); z-index:1; }
   .ch-circle.off { background:#e2e8f0; }
   .ch-circle.on  { box-shadow:0 4px 14px rgba(0,0,0,.2); }
   .ch-circle:active { transform:scale(.92); }
   .ch-gear { position:absolute; bottom:-5px; right:-5px; width:19px; height:19px; background:#fff; border:1.5px solid #e2e8f0; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; box-shadow:0 1px 3px rgba(0,0,0,.1); transition:all .15s; }
   .ch-gear:hover { background:#3b82f6; border-color:#3b82f6; }
   .ch-gear:hover .gear-icon { color:#fff; }
-  .mode-tag { position:absolute; top:-9px; left:50%; transform:translateX(-50%); font-size:9px; font-weight:700; padding:2px 6px; border-radius:10px; white-space:nowrap; pointer-events:none; }
+  .mode-tag { position:absolute; top:-9px; left:50%; transform:translateX(-50%); font-size:9px; font-weight:700; padding:2px 6px; border-radius:10px; white-space:nowrap; pointer-events:none; z-index:2; }
   .mt-sch { background:#dbeafe; color:#1d4ed8; }
   .mt-cir { background:#d1fae5; color:#065f46; }
   .mt-inc { background:#ede9fe; color:#5b21b6; }
@@ -130,6 +130,23 @@ function secLabel(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),r=s%60
 function chHex(n){return COL[(n-1)%COL.length];}
 
 // ── MQTT ──
+let _retryTimers = {};  // deviceId별 get/state 재시도 타이머
+
+function scheduleRetry(deviceId) {
+  // 이미 name이 있는 채널이 하나라도 있으면 재시도 중단
+  clearTimeout(_retryTimers[deviceId]);
+  const hasNamed = Object.values(state[deviceId].channels).some(ch=>ch.name?.trim());
+  if (hasNamed) return;
+  _retryTimers[deviceId] = setTimeout(()=>{
+    if (!client?.connected) return;
+    const hasNamedNow = Object.values(state[deviceId].channels).some(ch=>ch.name?.trim());
+    if (hasNamedNow) return;
+    log(`🔄 [${deviceId}] state/full 미수신 → get/state 재시도`,'lx');
+    client.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1});
+    scheduleRetry(deviceId);  // 10초 후 또 재시도
+  }, 10000);
+}
+
 function connectMQTT(){
   const url=document.getElementById('mqtt-url').value.trim();
   const user=document.getElementById('mqtt-username').value.trim();
@@ -151,6 +168,7 @@ function connectMQTT(){
         log(`📡 [${deviceId}] 구독 완료`);
         client.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1});
         log(`📤 [${deviceId}] get/state 요청`,'ls');
+        scheduleRetry(deviceId);  // ★ 10초마다 재시도 예약
       });
     });
   });
@@ -162,6 +180,8 @@ function connectMQTT(){
   });
 }
 function disconnectMQTT(){
+  Object.values(_retryTimers).forEach(t=>clearTimeout(t));
+  _retryTimers={};
   client?.end();
   const dv=document.getElementById('dashboard-view');
   dv.classList.add('hidden'); dv.classList.remove('flex');
@@ -181,12 +201,15 @@ function onMessage(topic,buf){
     if(topic.endsWith('/state/full')){
       const data=JSON.parse(payload);
       (data.ch||[]).forEach(ch=>{state[deviceId].channels[ch.n]={...(state[deviceId].channels[ch.n]||{}),...ch};});
+      clearTimeout(_retryTimers[deviceId]);  // name 수신됨 → 재시도 중단
       renderDevice(deviceId); return;
     }
     const m=topic.match(/\/ch\/(\d+)\/state$/);
     if(m){
       const n=parseInt(m[1]),d=JSON.parse(payload);
-      state[deviceId].channels[n]={...(state[deviceId].channels[n]||{}),relay:d.relay,mode:d.mode};
+      // ★ ch/+/state에는 name이 없음 → 기존 name 보존, relay/mode만 갱신
+      const prev=state[deviceId].channels[n]||{};
+      state[deviceId].channels[n]={...prev,relay:d.relay,mode:d.mode};
       renderChBtn(deviceId,n); return;
     }
     if(topic.endsWith('/meta/online')){setOnline(deviceId,!!JSON.parse(payload).online);return;}
@@ -197,7 +220,15 @@ function onMessage(topic,buf){
     }
   }catch(e){log(`⚠️ JSON 오류: ${e.message}`,'le');}
 }
-function requestAllStates(){DEVICE_LIST.forEach(id=>{client?.publish(`hdh/${id}/get/state`,'GET',{qos:1});log(`📤 [${id}] get/state 재요청`,'ls');});}
+function requestAllStates(){
+  Object.values(_retryTimers).forEach(t=>clearTimeout(t));
+  _retryTimers={};
+  DEVICE_LIST.forEach(id=>{
+    client?.publish(`hdh/${id}/get/state`,'GET',{qos:1});
+    log(`📤 [${id}] get/state 재요청`,'ls');
+    scheduleRetry(id);
+  });
+}
 
 // ── 카드 생성 ──
 function buildDeviceCards(){
