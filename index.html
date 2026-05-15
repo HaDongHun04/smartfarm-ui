@@ -1,837 +1,662 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Smart Farm Control Dashboard</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Smart Farm Control</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+  * { box-sizing: border-box; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: #0f1117; color: #e2e8f0; -webkit-tap-highlight-color: transparent; user-select: none; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- MQTT.js -->
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  /* 로그인 */
+  .login-card { background: #1a1d27; border: 1px solid #2d3149; border-radius: 20px; }
+  .input-field { background: #0f1117; border: 1px solid #2d3149; border-radius: 10px; color: #e2e8f0; padding: 12px 14px; width: 100%; font-size: 13px; outline: none; transition: border-color .2s; }
+  .input-field:focus { border-color: #4ade80; }
+  .btn-primary { background: #4ade80; color: #0f1117; border-radius: 10px; font-weight: 900; padding: 13px; width: 100%; font-size: 14px; cursor: pointer; transition: background .2s, transform .1s; border: none; }
+  .btn-primary:hover { background: #22c55e; }
+  .btn-primary:active { transform: scale(.98); }
 
-    <style>
-        body {
-            background-color: #f0f4f8;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
+  /* 카드 */
+  .device-card { background: #1a1d27; border: 1px solid #2d3149; border-radius: 20px; padding: 20px; }
+  .device-card.offline { opacity: .5; pointer-events: none; filter: grayscale(.6); }
 
-        .bg-tuya-blue {
-            background-color: #4fc3f7;
-        }
+  /* 채널 버튼 */
+  .ch-btn { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+  .ch-circle { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all .2s; position: relative; }
+  .ch-circle.off { background: #2d3149; }
+  .ch-circle.on  { box-shadow: 0 0 16px currentColor; }
+  .ch-circle:active { transform: scale(.93); }
+  .ch-gear { position: absolute; bottom: -6px; right: -6px; width: 20px; height: 20px; background: #2d3149; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #3d4269; transition: background .15s; z-index: 2; }
+  .ch-gear:hover { background: #4ade80; }
+  .ch-gear:hover svg { color: #0f1117; }
+  .mode-tag { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 10px; white-space: nowrap; pointer-events: none; }
 
-        .bg-tuya-green {
-            background-color: #4ade80;
-        }
+  /* 색상 */
+  .c-green  { color: #4ade80; background-color: #166534; }
+  .c-blue   { color: #60a5fa; background-color: #1e3a5f; }
+  .c-orange { color: #fb923c; background-color: #7c2d12; }
+  .c-purple { color: #a78bfa; background-color: #3b1f6e; }
+  .c-cyan   { color: #22d3ee; background-color: #164e63; }
+  .c-yellow { color: #facc15; background-color: #713f12; }
 
-        .bg-tuya-orange {
-            background-color: #ff9800;
-        }
+  /* 온라인 배지 */
+  .badge-online  { background: #166534; color: #4ade80; }
+  .badge-offline { background: #2d3149; color: #64748b; }
+  .badge-wait    { background: #2d3149; color: #94a3b8; }
 
-        .bg-tuya-yellow {
-            background-color: #facc15;
-        }
+  /* 스피너 */
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-        .bg-tuya-off {
-            background-color: #d1d5db;
-        }
+  /* 모달 */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+  .modal-sheet { background: #1a1d27; border: 1px solid #2d3149; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 24px 20px 40px; }
+  .modal-handle { width: 40px; height: 4px; background: #2d3149; border-radius: 2px; margin: 0 auto 20px; }
 
-        .btn-shadow {
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
+  /* 설정 패널 요소 */
+  .setting-row { background: #0f1117; border: 1px solid #2d3149; border-radius: 12px; padding: 14px; margin-bottom: 8px; }
+  .tag-schedule { background: #1e3a5f; color: #60a5fa; }
+  .tag-circulate { background: #166534; color: #4ade80; }
+  .tag-inching { background: #3b1f6e; color: #a78bfa; }
+  .input-sm { background: #0f1117; border: 1px solid #2d3149; border-radius: 8px; color: #e2e8f0; padding: 7px 10px; font-size: 12px; outline: none; width: 100%; }
+  .input-sm:focus { border-color: #4ade80; }
+  .btn-sm { border-radius: 8px; font-weight: 700; font-size: 12px; padding: 7px 14px; cursor: pointer; border: none; transition: background .15s; }
+  .btn-add { background: #4ade80; color: #0f1117; }
+  .btn-add:hover { background: #22c55e; }
+  .btn-del { background: #3f1919; color: #f87171; }
+  .btn-del:hover { background: #5c2020; }
+  .btn-outline { background: transparent; border: 1px solid #2d3149; color: #94a3b8; }
+  .btn-outline:hover { border-color: #4ade80; color: #4ade80; }
 
-        .btn-transition {
-            transition: all 0.2s ease-in-out;
-        }
+  /* 모드 선택 탭 */
+  .mode-tab { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid #2d3149; color: #64748b; background: transparent; transition: all .15s; }
+  .mode-tab.active { background: #4ade80; color: #0f1117; border-color: #4ade80; }
 
-        .btn-active {
-            transform: scale(0.95);
-        }
-
-        .spinner {
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top: 3px solid #ffffff;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        .device-offline {
-            opacity: 0.6;
-            filter: grayscale(50%);
-            pointer-events: none;
-        }
-
-        /* 스크롤바 커스텀 */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #4b5563;
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-    </style>
+  /* 디버그 콘솔 */
+  #debug-log { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #4ade80; height: 100px; overflow-y: auto; line-height: 1.6; }
+  .log-send { color: #60a5fa; }
+  .log-recv { color: #4ade80; }
+  .log-err  { color: #f87171; }
+  .log-sys  { color: #94a3b8; }
+</style>
 </head>
-<body class="min-h-screen text-gray-800 font-sans flex justify-center items-start">
+<body class="min-h-screen flex flex-col items-center py-6 px-4">
 
-    <!-- ========================================== -->
-    <!-- 1. 로그인 뷰 -->
-    <!-- ========================================== -->
-    <div id="login-view" class="w-full max-w-md h-screen flex flex-col justify-center px-6 transition-opacity duration-300">
-        <div class="bg-white rounded-3xl p-8 shadow-sm text-center">
-            <div class="flex justify-center mb-4">
-                <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500">
-                    <i data-lucide="leaf" class="w-8 h-8"></i>
-                </div>
-            </div>
-            <h1 class="text-2xl font-extrabold tracking-tight mb-2">Smart Farm</h1>
-            <p class="text-sm text-gray-400 mb-6 font-medium">관리자 계정으로 접속하여 모든 기기를 제어하세요.</p>
+<!-- ── 로그인 뷰 ─────────────────────────────── -->
+<div id="login-view" class="w-full max-w-sm">
+  <div class="login-card p-8">
+    <div class="text-center mb-6">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-900 mb-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l7 7-7 7M12 3l7 7-7 7"/></svg>
+      </div>
+      <h1 class="text-xl font-black tracking-tight">Smart Farm</h1>
+      <p class="text-xs text-slate-500 mt-1">관리자 계정으로 접속하세요</p>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="text-[10px] font-bold text-slate-500 mb-1 block">WebSocket URL</label>
+        <input id="mqtt-url" class="input-field" value="wss://2cda7be527f245e1bfdd99c16a70d52d.s1.eu.hivemq.cloud:8884/mqtt">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500 mb-1 block">Username</label>
+        <input id="mqtt-username" class="input-field" placeholder="Username">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500 mb-1 block">Password</label>
+        <input id="mqtt-password" class="input-field" type="password" placeholder="Password">
+      </div>
+      <p id="login-error" class="text-red-400 text-xs font-bold hidden"></p>
+      <button onclick="connectMQTT()" class="btn-primary flex items-center justify-center gap-2 mt-2">
+        <span id="btn-login-text">연결</span>
+        <svg id="btn-spinner" class="w-4 h-4 spin hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
 
-            <form class="space-y-3 mb-6 text-left" onsubmit="connectMQTT(); return false;">
-                <div>
-                    <label class="text-[11px] font-bold text-gray-400 ml-1">WebSocket URL</label>
-                    <input id="mqtt-url" name="mqtt_url" type="text" autocomplete="off" value="wss://2cda7be527f245e1bfdd99c16a70d52d.s1.eu.hivemq.cloud:8884/mqtt"
-                           class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:bg-white transition-colors">
-                </div>
-                <div>
-                    <label class="text-[11px] font-bold text-gray-400 ml-1">계정 정보</label>
-                    <input id="mqtt-username" name="username" type="text" autocomplete="username" placeholder="Username"
-                           class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm mb-2 focus:outline-none focus:border-blue-400 focus:bg-white transition-colors">
+<!-- ── 대시보드 뷰 ────────────────────────────── -->
+<div id="dashboard-view" class="w-full max-w-sm hidden flex-col gap-4">
 
-                    <div class="relative">
-                        <input id="mqtt-password" name="password" type="password" autocomplete="current-password" placeholder="Password를 입력하세요"
-                               class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:bg-white transition-colors">
-                        <button type="button" onclick="togglePassword()" class="absolute right-3 top-3 text-gray-400 hover:text-blue-500">
-                            <i data-lucide="eye" id="eye-icon" class="w-5 h-5"></i>
-                        </button>
-                    </div>
-                </div>
+  <!-- 헤더 -->
+  <div class="flex items-center justify-between px-1">
+    <div>
+      <h1 class="text-lg font-black tracking-tight">통합 관제</h1>
+      <p id="conn-status" class="text-[11px] text-green-400 font-bold mono mt-0.5">● 연결됨</p>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="requestAllStates()" class="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:text-green-400 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0114.13-1.13M20 15A9 9 0 015.87 16.13"/></svg>
+      </button>
+      <button onclick="disconnectMQTT()" class="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:text-red-400 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1"/></svg>
+      </button>
+    </div>
+  </div>
 
-                <p id="login-error" class="text-red-500 text-xs font-bold mb-4 hidden"></p>
+  <!-- 기기 카드 컨테이너 -->
+  <div id="device-cards"></div>
 
-                <button id="btn-login" type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-md shadow-blue-200">
-                    <span id="btn-login-text">통합 관제 연결</span>
-                    <div id="btn-login-spinner" class="spinner hidden"></div>
-                </button>
-            </form>
+  <!-- 디버그 콘솔 -->
+  <div class="device-card">
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-[10px] font-bold text-slate-500 mono">SYSTEM LOG</span>
+      <button onclick="document.getElementById('debug-log').innerHTML=''" class="text-[10px] text-slate-600 hover:text-slate-400">지우기</button>
+    </div>
+    <div id="debug-log">대기 중...<br></div>
+  </div>
+</div>
 
+<!-- ── 채널 설정 모달 ──────────────────────────── -->
+<div id="cfg-modal" class="modal-bg hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  설정
+// ═══════════════════════════════════════════════════════
+const DEVICE_LIST = ['box01', 'box02'];
+const DEVICE_LABELS = { box01: '10기 3조 담액식', box02: '스마트팜 분무식' };
+const CH_COLORS = ['c-green','c-blue','c-orange','c-purple','c-cyan','c-yellow'];
+
+// 상태
+const state = {};
+DEVICE_LIST.forEach(id => {
+  state[id] = { online: false, lastSeen: 0, channels: {} };
+});
+
+let client = null;
+
+// ═══════════════════════════════════════════════════════
+//  유틸
+// ═══════════════════════════════════════════════════════
+function log(msg, cls='log-sys') {
+  const el = document.getElementById('debug-log');
+  const time = new Date().toLocaleTimeString('ko',{hour12:false});
+  el.innerHTML += `<span class="${cls}">[${time}] ${msg}</span><br>`;
+  el.scrollTop = el.scrollHeight;
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function pad2(n) { return String(n).padStart(2,'0'); }
+function hm(h,m) { return `${pad2(h)}:${pad2(m)}`; }
+function parseHM(s) {
+  const [h,m] = s.split(':').map(Number);
+  return { h: h||0, m: m||0 };
+}
+function secToHMS(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), r = s%60;
+  return h>0 ? `${h}시간 ${m}분` : m>0 ? `${m}분 ${r}초` : `${r}초`;
+}
+function chColor(chNum) { return CH_COLORS[(chNum-1) % CH_COLORS.length]; }
+
+// ═══════════════════════════════════════════════════════
+//  MQTT 연결/구독
+// ═══════════════════════════════════════════════════════
+function connectMQTT() {
+  const url  = document.getElementById('mqtt-url').value.trim();
+  const user = document.getElementById('mqtt-username').value.trim();
+  const pass = document.getElementById('mqtt-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.classList.add('hidden');
+  document.getElementById('btn-login-text').textContent = '연결 중...';
+  document.getElementById('btn-spinner').classList.remove('hidden');
+
+  client = mqtt.connect(url, { username:user, password:pass, connectTimeout:8000, reconnectPeriod:0 });
+
+  client.on('connect', () => {
+    document.getElementById('login-view').classList.add('hidden');
+    document.getElementById('dashboard-view').classList.remove('hidden');
+    document.getElementById('dashboard-view').classList.add('flex');
+    buildDeviceCards();
+
+    DEVICE_LIST.forEach(deviceId => {
+      const base = `hdh/${deviceId}/`;
+      const topics = [
+        base+'state/full', base+'ch/+/state',
+        base+'meta/online', base+'meta/last_seen', base+'meta/last_connect'
+      ];
+      client.subscribe(topics, { qos:1 }, err => {
+        if (err) { log(`❌ 구독 오류: ${err}`, 'log-err'); return; }
+        log(`📡 [${deviceId}] 구독 완료`, 'log-sys');
+        // 단 1번 요청으로 모든 채널 정보 수신
+        client.publish(`hdh/${deviceId}/get/state`, 'GET', { qos:1 });
+        log(`📤 [${deviceId}] get/state 요청`, 'log-send');
+      });
+    });
+  });
+
+  client.on('message', onMessage);
+  client.on('error', err => {
+    errEl.textContent = '연결 실패: ' + err.message;
+    errEl.classList.remove('hidden');
+    document.getElementById('btn-login-text').textContent = '연결';
+    document.getElementById('btn-spinner').classList.add('hidden');
+  });
+}
+
+function disconnectMQTT() {
+  client?.end();
+  document.getElementById('dashboard-view').classList.add('hidden');
+  document.getElementById('dashboard-view').classList.remove('flex');
+  document.getElementById('login-view').classList.remove('hidden');
+  document.getElementById('btn-login-text').textContent = '연결';
+  document.getElementById('btn-spinner').classList.add('hidden');
+}
+
+// ═══════════════════════════════════════════════════════
+//  메시지 수신
+// ═══════════════════════════════════════════════════════
+function onMessage(topic, buf) {
+  const payload = buf.toString();
+  const parts = topic.split('/');
+  const deviceId = parts[1];
+  if (!DEVICE_LIST.includes(deviceId)) return;
+
+  log(`📥 ${topic.replace(`hdh/${deviceId}/`,'')} ← ${payload.length>80?payload.slice(0,80)+'…':payload}`, 'log-recv');
+
+  try {
+    // state/full : 한 번에 모든 채널 정보
+    if (topic.endsWith('/state/full')) {
+      const data = JSON.parse(payload);
+      (data.ch || []).forEach(ch => {
+        state[deviceId].channels[ch.n] = {
+          ...state[deviceId].channels[ch.n],
+          ...ch
+        };
+      });
+      renderDevice(deviceId);
+      return;
+    }
+    // ch/N/state : 실시간 ON/OFF
+    const chMatch = topic.match(/\/ch\/(\d+)\/state$/);
+    if (chMatch) {
+      const n = parseInt(chMatch[1]);
+      const data = JSON.parse(payload);
+      if (!state[deviceId].channels[n]) state[deviceId].channels[n] = {};
+      state[deviceId].channels[n].relay = data.relay;
+      state[deviceId].channels[n].mode  = data.mode;
+      renderChannelBtn(deviceId, n);
+      return;
+    }
+    // meta/online
+    if (topic.endsWith('/meta/online')) {
+      const data = JSON.parse(payload);
+      setOnline(deviceId, !!data.online);
+      return;
+    }
+    // meta/last_seen
+    if (topic.endsWith('/meta/last_seen')) {
+      const data = JSON.parse(payload);
+      state[deviceId].lastSeen = data.epoch;
+      renderDeviceMeta(deviceId);
+      return;
+    }
+  } catch(e) { log(`⚠️ JSON 파싱 오류: ${e.message}`, 'log-err'); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  전체 상태 요청
+// ═══════════════════════════════════════════════════════
+function requestAllStates() {
+  DEVICE_LIST.forEach(deviceId => {
+    client?.publish(`hdh/${deviceId}/get/state`, 'GET', { qos:1 });
+    log(`📤 [${deviceId}] get/state 재요청`, 'log-send');
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  기기 카드 생성 (최초 1회)
+// ═══════════════════════════════════════════════════════
+function buildDeviceCards() {
+  const wrap = document.getElementById('device-cards');
+  wrap.innerHTML = DEVICE_LIST.map(id => `
+    <div id="card-${id}" class="device-card mb-4">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <span class="mono text-[10px] font-bold text-slate-500 bg-slate-800 px-2 py-1 rounded">${id.toUpperCase()}</span>
+          <div>
+            <p class="text-sm font-bold leading-tight">${esc(DEVICE_LABELS[id]||id)}</p>
+            <p id="meta-${id}" class="text-[10px] text-slate-500 mono mt-0.5">—</p>
+          </div>
         </div>
+        <span id="badge-${id}" class="text-[9px] font-bold px-2 py-0.5 rounded-full badge-wait">확인 중</span>
+      </div>
+      <div id="channels-${id}" class="grid grid-cols-3 gap-4 min-h-[72px]">
+        <div class="col-span-3 text-center text-xs text-slate-600 py-4">상태 조회 중...</div>
+      </div>
+      <!-- 채널 추가 -->
+      <div class="mt-4 pt-4 border-t border-slate-800">
+        <div class="grid grid-cols-2 gap-2">
+          <input id="add-name-${id}" class="input-sm" placeholder="채널 이름">
+          <input id="add-pin-${id}"  class="input-sm" type="number" min="0" max="127" placeholder="GPIO Pin">
+          <select id="add-ch-${id}" class="input-sm col-span-1">
+            ${Array.from({length:12},(_,i)=>`<option value="${i+1}">CH${i+1}</option>`).join('')}
+          </select>
+          <button onclick="addChannel('${id}')" class="btn-sm btn-add">+ 추가</button>
+        </div>
+        <p id="add-err-${id}" class="text-red-400 text-[10px] font-bold mt-1 hidden"></p>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  렌더링
+// ═══════════════════════════════════════════════════════
+function renderDevice(deviceId) {
+  const chs = state[deviceId].channels;
+  const named = Object.keys(chs).map(Number).filter(n => chs[n]?.name?.trim()).sort((a,b)=>a-b);
+  const wrap = document.getElementById(`channels-${deviceId}`);
+  if (!wrap) return;
+
+  if (named.length === 0) {
+    wrap.innerHTML = '<div class="col-span-3 text-center text-xs text-slate-600 py-4">이름이 설정된 채널이 없습니다</div>';
+  } else {
+    wrap.innerHTML = named.map(n => channelBtnHTML(deviceId, n)).join('');
+  }
+  // 추가 셀렉트 갱신
+  const sel = document.getElementById(`add-ch-${deviceId}`);
+  if (sel) {
+    const used = new Set(named);
+    sel.innerHTML = Array.from({length:12},(_,i)=>i+1)
+      .filter(n=>!used.has(n))
+      .map(n=>`<option value="${n}">CH${n}</option>`).join('');
+  }
+  lucide.createIcons();
+}
+
+function channelBtnHTML(deviceId, chNum) {
+  const ch = state[deviceId].channels[chNum] || {};
+  const on = !!ch.relay;
+  const mode = Number(ch.mode)||0;
+  const col = chColor(chNum);
+  const modeLabels = ['','스케줄','순환','인칭'];
+  const modeTagCls = ['','tag-schedule','tag-circulate','tag-inching'];
+
+  return `
+  <div class="ch-btn" id="chbtn-${deviceId}-${chNum}">
+    ${mode>0?`<span class="mode-tag ${modeTagCls[mode]||''}">${modeLabels[mode]||''}</span>`:''}
+    <div class="ch-circle ${on?'on':'off'} ${on?col:''}"
+         onclick="toggleChannel('${deviceId}',${chNum})"
+         style="${on?`color:var(--tw-prose-bold,currentColor)`:''}">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="${on?`color:${colHex(col)}`:'color:#64748b'}">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v4M6.34 6.34l2.83 2.83M3 12h4M6.34 17.66l2.83-2.83M12 17v4M17.66 17.66l-2.83-2.83M21 12h-4M17.66 6.34l-2.83 2.83"/>
+      </svg>
+      <span class="ch-gear" onclick="event.stopPropagation();openCfg('${deviceId}',${chNum})">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </span>
+    </div>
+    <span class="text-[11px] font-bold text-center leading-tight" style="color:${on?colHex(col):'#64748b'}">${esc(ch.name||'CH'+chNum)}<br><span class="text-[9px] text-slate-600 font-normal">CH${chNum}</span></span>
+  </div>`;
+}
+
+function renderChannelBtn(deviceId, chNum) {
+  const el = document.getElementById(`chbtn-${deviceId}-${chNum}`);
+  if (!el) return;
+  el.outerHTML = channelBtnHTML(deviceId, chNum);
+  lucide.createIcons();
+}
+
+function renderDeviceMeta(deviceId) {
+  const el = document.getElementById(`meta-${deviceId}`);
+  if (!el) return;
+  const ts = state[deviceId].lastSeen;
+  el.textContent = ts ? '최근: ' + new Date(ts*1000).toLocaleString('ko',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+}
+
+function setOnline(deviceId, online) {
+  state[deviceId].online = online;
+  const card  = document.getElementById(`card-${deviceId}`);
+  const badge = document.getElementById(`badge-${deviceId}`);
+  if (!card || !badge) return;
+  if (online) {
+    card.classList.remove('offline');
+    badge.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full badge-online';
+    badge.textContent = '온라인';
+  } else {
+    card.classList.add('offline');
+    badge.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full badge-offline';
+    badge.textContent = '오프라인';
+  }
+}
+
+function colHex(cls) {
+  const map = { 'c-green':'#4ade80','c-blue':'#60a5fa','c-orange':'#fb923c','c-purple':'#a78bfa','c-cyan':'#22d3ee','c-yellow':'#facc15' };
+  return map[cls]||'#60a5fa';
+}
+
+// ═══════════════════════════════════════════════════════
+//  채널 토글
+// ═══════════════════════════════════════════════════════
+function toggleChannel(deviceId, chNum) {
+  if (!client?.connected) return;
+  const ch = state[deviceId].channels[chNum];
+  const topic = `hdh/${deviceId}/ch/${chNum}/cmd`;
+  const payload = ch?.relay ? 'OFF' : 'ON';
+  client.publish(topic, payload, { qos:1 });
+  log(`📤 ${deviceId}/ch/${chNum}/cmd → ${payload}`, 'log-send');
+  // 낙관적 업데이트
+  if (!state[deviceId].channels[chNum]) state[deviceId].channels[chNum] = {};
+  state[deviceId].channels[chNum].relay = !ch?.relay;
+  renderChannelBtn(deviceId, chNum);
+}
+
+// ═══════════════════════════════════════════════════════
+//  채널 추가
+// ═══════════════════════════════════════════════════════
+function addChannel(deviceId) {
+  const name = document.getElementById(`add-name-${deviceId}`).value.trim();
+  const pin  = parseInt(document.getElementById(`add-pin-${deviceId}`).value);
+  const chNum= parseInt(document.getElementById(`add-ch-${deviceId}`).value);
+  const errEl= document.getElementById(`add-err-${deviceId}`);
+  const setErr = msg => { errEl.textContent = msg; errEl.classList.toggle('hidden', !msg); };
+  setErr('');
+  if (!name) return setErr('채널 이름을 입력하세요.');
+  if (/\s/.test(name)) return setErr('이름에 공백 불가.');
+  if (new TextEncoder().encode(name).length > 15) return setErr('이름은 15바이트 이하.');
+  if (!Number.isInteger(pin)||pin<0||pin>127) return setErr('GPIO Pin: 0~127');
+
+  client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,  `${pin} 1 0`, { qos:1 });
+  client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/name`, name,          { qos:1 });
+  log(`📤 CH${chNum} 추가: ${name} pin=${pin}`, 'log-send');
+
+  if (!state[deviceId].channels[chNum]) state[deviceId].channels[chNum] = {};
+  Object.assign(state[deviceId].channels[chNum], { name, pin, lvl:1, init:0, mode:0, relay:false, schedule:[], circulate:[] });
+  renderDevice(deviceId);
+  document.getElementById(`add-name-${deviceId}`).value = '';
+  document.getElementById(`add-pin-${deviceId}`).value  = '';
+
+  // 아두이노에서 최신 cfg 재수신
+  setTimeout(() => {
+    client.publish(`hdh/${deviceId}/get/state`, 'GET', { qos:1 });
+  }, 600);
+}
+
+// ═══════════════════════════════════════════════════════
+//  채널 설정 모달
+// ═══════════════════════════════════════════════════════
+let _modalCtx = null; // { deviceId, chNum }
+
+function openCfg(deviceId, chNum) {
+  _modalCtx = { deviceId, chNum };
+  renderModal();
+  document.getElementById('cfg-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('cfg-modal').classList.add('hidden');
+  _modalCtx = null;
+}
+
+function renderModal() {
+  if (!_modalCtx) return;
+  const { deviceId, chNum } = _modalCtx;
+  const ch = state[deviceId].channels[chNum] || {};
+  const mode = Number(ch.mode)||0;
+  const modeNames = ['수동','스케줄','순환','인칭'];
+
+  let detailHTML = '';
+  if (mode === 1) detailHTML = renderScheduleCfg(deviceId, chNum, ch);
+  else if (mode === 2) detailHTML = renderCirculateCfg(deviceId, chNum, ch);
+  else if (mode === 3) detailHTML = renderInchingCfg(deviceId, chNum, ch);
+  else detailHTML = `<p class="text-xs text-slate-500 text-center py-3">수동 모드 — 버튼으로 직접 ON/OFF 제어</p>`;
+
+  document.getElementById('modal-content').innerHTML = `
+    <div class="flex items-center gap-3 mb-5">
+      <div class="w-9 h-9 rounded-full flex items-center justify-center ${chColor(chNum)}" style="background:${colHex(chColor(chNum))}22">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:${colHex(chColor(chNum))}">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v4M6.34 6.34l2.83 2.83M3 12h4M6.34 17.66l2.83-2.83M12 17v4M17.66 17.66l-2.83-2.83M21 12h-4M17.66 6.34l-2.83 2.83"/>
+        </svg>
+      </div>
+      <div>
+        <p class="font-bold">${esc(ch.name||'CH'+chNum)} <span class="text-slate-500 text-xs font-normal">CH${chNum}</span></p>
+        <p class="text-[11px] text-slate-500">현재 ${modeNames[mode]} 모드</p>
+      </div>
     </div>
 
-
-    <!-- ========================================== -->
-    <!-- 2. 다중 기기 대시보드 뷰 -->
-    <!-- ========================================== -->
-    <div id="dashboard-view" class="w-full max-w-md flex flex-col gap-4 p-4 md:p-8 hidden opacity-0 transition-opacity duration-500 pb-12">
-
-        <div class="flex justify-between items-center mb-2 px-1">
-            <div>
-                <h1 class="text-xl font-extrabold tracking-tight">통합 관제 패널</h1>
-                <p class="text-xs font-bold text-blue-500 tracking-wide mt-1" id="connection-status">● 서버 접속됨</p>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="requestAllStates()" class="p-2 bg-white rounded-full shadow-sm text-gray-500 hover:text-blue-500 transition-colors" title="전체 상태 동기화">
-                    <i data-lucide="refresh-cw" class="w-5 h-5"></i>
-                </button>
-                <button onclick="disconnectMQTT()" class="p-2 bg-white rounded-full shadow-sm text-gray-500 hover:text-red-500 transition-colors" title="로그아웃">
-                    <i data-lucide="log-out" class="w-5 h-5"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- ============================== -->
-        <!-- 기기 1: box01 -->
-        <!-- ============================== -->
-        <div id="card-box01" class="bg-white rounded-3xl p-6 shadow-sm btn-transition relative overflow-hidden">
-            <div id="status-badge-box01" class="absolute top-0 right-0 bg-gray-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl transition-colors">
-                확인 중...
-            </div>
-
-            <div class="flex items-center gap-4 mb-8 mt-2">
-                <div class="w-14 h-9 border border-gray-200 rounded-md flex items-center justify-center text-[8px] font-bold tracking-widest text-gray-500 shadow-inner bg-gray-50">BOX01</div>
-                <div class="flex-1">
-                    <h2 class="text-lg font-extrabold tracking-tight">10기 3조 담액식</h2>
-                </div>
-            </div>
-
-            <div id="channels-box01" class="grid grid-cols-2 sm:grid-cols-4 gap-4 px-1">
-                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 1)">
-                    <div id="btn-box01-ch1" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
-                        <i data-lucide="power" class="w-5 h-5"></i>
-                        <span id="mode-box01-ch1" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
-                    </div>
-                    <span id="label-box01-ch1" class="text-[13px] font-bold text-gray-700 text-center leading-tight">모터<br><span class="text-[10px] text-gray-400 font-normal">(CH1)</span></span>
-                </div>
-                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 2)">
-                    <div id="btn-box01-ch2" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
-                        <i data-lucide="power" class="w-5 h-5"></i>
-                        <span id="mode-box01-ch2" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
-                    </div>
-                    <span id="label-box01-ch2" class="text-[13px] font-bold text-gray-700 text-center leading-tight">예비<br><span class="text-[10px] text-gray-400 font-normal">(CH2)</span></span>
-                </div>
-                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 3)">
-                    <div id="btn-box01-ch3" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
-                        <i data-lucide="power" class="w-5 h-5"></i>
-                        <span id="mode-box01-ch3" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
-                    </div>
-                    <span id="label-box01-ch3" class="text-[13px] font-bold text-gray-700 text-center leading-tight">하단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH3)</span></span>
-                </div>
-                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box01', 4)">
-                    <div id="btn-box01-ch4" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
-                        <i data-lucide="power" class="w-5 h-5"></i>
-                        <span id="mode-box01-ch4" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
-                    </div>
-                    <span id="label-box01-ch4" class="text-[13px] font-bold text-gray-700 text-center leading-tight">상단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH4)</span></span>
-                </div>
-            </div>
-
-            <div class="mt-6 pt-4 border-t border-gray-100">
-                <div class="grid grid-cols-[88px_1fr] gap-2">
-                    <select id="new-box01-ch" class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold focus:outline-none focus:border-blue-400"></select>
-                    <input id="new-box01-pin" type="number" min="0" max="127" inputmode="numeric" placeholder="GPIO Pin"
-                           class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-400">
-                    <input id="new-box01-name" type="text" maxlength="15" placeholder="채널 이름"
-                           class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-400">
-                    <button id="add-box01-btn" type="button" onclick="addChannel('box01')" class="bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors">
-                        <i data-lucide="plus" class="w-4 h-4"></i>추가
-                    </button>
-                </div>
-                <p id="add-error-box01" class="hidden mt-2 text-[11px] font-bold text-red-500"></p>
-            </div>
-        </div>
-
-        <!-- ============================== -->
-        <!-- 기기 2: box02 -->
-        <!-- ============================== -->
-        <div id="card-box02" class="bg-white rounded-3xl p-6 shadow-sm btn-transition relative overflow-hidden">
-            <div id="status-badge-box02" class="absolute top-0 right-0 bg-gray-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl transition-colors">
-                확인 중...
-            </div>
-
-            <div class="flex items-center gap-4 mb-8 mt-2">
-                <div class="w-14 h-9 border border-gray-200 rounded-md flex items-center justify-center text-[8px] font-bold tracking-widest text-gray-500 shadow-inner bg-gray-50">BOX02</div>
-                <div class="flex-1">
-                    <h2 class="text-lg font-extrabold tracking-tight">스마트팜 10기 3조 분무식</h2>
-                </div>
-            </div>
-
-            <div id="channels-box02" class="grid grid-cols-2 sm:grid-cols-4 gap-4 px-1">
-                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 1)">
-                    <div id="btn-box02-ch1" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
-                        <i data-lucide="power" class="w-5 h-5"></i>
-                        <span id="mode-box02-ch1" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
-                    </div>
-                    <span id="label-box02-ch1" class="text-[13px] font-bold text-gray-700 text-center leading-tight">상단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH1)</span></span>
-                </div>
-                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 2)">
-                    <div id="btn-box02-ch2" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
-                        <i data-lucide="power" class="w-5 h-5"></i>
-                        <span id="mode-box02-ch2" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
-                    </div>
-                    <span id="label-box02-ch2" class="text-[13px] font-bold text-gray-700 text-center leading-tight">하단 LED<br><span class="text-[10px] text-gray-400 font-normal">(CH2)</span></span>
-                </div>
-                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 3)">
-                    <div id="btn-box02-ch3" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
-                        <i data-lucide="power" class="w-5 h-5"></i>
-                        <span id="mode-box02-ch3" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
-                    </div>
-                    <span id="label-box02-ch3" class="text-[13px] font-bold text-gray-700 text-center leading-tight">분무 모터<br><span class="text-[10px] text-gray-400 font-normal">(CH3)</span></span>
-                </div>
-                <div class="flex flex-col items-center gap-2 cursor-pointer w-1/4" onclick="toggleChannel('box02', 4)">
-                    <div id="btn-box02-ch4" class="w-12 h-12 rounded-full bg-tuya-off flex items-center justify-center text-white btn-shadow btn-transition relative">
-                        <i data-lucide="power" class="w-5 h-5"></i>
-                        <span id="mode-box02-ch4" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap hidden">모드</span>
-                    </div>
-                    <span id="label-box02-ch4" class="text-[13px] font-bold text-gray-700 text-center leading-tight">예비<br><span class="text-[10px] text-gray-400 font-normal">(CH4)</span></span>
-                </div>
-            </div>
-
-            <div class="mt-6 pt-4 border-t border-gray-100">
-                <div class="grid grid-cols-[88px_1fr] gap-2">
-                    <select id="new-box02-ch" class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold focus:outline-none focus:border-blue-400"></select>
-                    <input id="new-box02-pin" type="number" min="0" max="127" inputmode="numeric" placeholder="GPIO Pin"
-                           class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-400">
-                    <input id="new-box02-name" type="text" maxlength="15" placeholder="채널 이름"
-                           class="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-400">
-                    <button id="add-box02-btn" type="button" onclick="addChannel('box02')" class="bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors">
-                        <i data-lucide="plus" class="w-4 h-4"></i>추가
-                    </button>
-                </div>
-                <p id="add-error-box02" class="hidden mt-2 text-[11px] font-bold text-red-500"></p>
-            </div>
-        </div>
-
-        <!-- ============================== -->
-        <!-- 💡 실시간 디버그 콘솔 -->
-        <!-- ============================== -->
-        <div class="bg-gray-900 rounded-2xl p-4 shadow-inner mt-2">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-gray-400"><i data-lucide="terminal" class="w-3 h-3 inline mr-1"></i>실시간 통신 로그</span>
-                <button onclick="document.getElementById('debug-log').innerHTML=''" class="text-[10px] bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition-colors">지우기</button>
-            </div>
-            <div id="debug-log" class="text-[11px] font-mono text-green-400 h-32 overflow-y-auto leading-relaxed break-all">
-                대기 중...<br>
-            </div>
-        </div>
-
+    <!-- 모드 선택 -->
+    <div class="flex gap-2 mb-4 flex-wrap">
+      ${[0,1,2,3].map(m=>`<button class="mode-tab ${mode===m?'active':''}" onclick="setMode('${deviceId}',${chNum},${m})">${modeNames[m]}</button>`).join('')}
     </div>
 
-    <script>
-        lucide.createIcons();
-
-        function togglePassword() {
-        const pwdInput = document.getElementById('mqtt-password');
-        const eyeIcon = document.getElementById('eye-icon');
-        if (pwdInput.type === "password") {
-        pwdInput.type = "text";
-        eyeIcon.setAttribute('data-lucide', 'eye-off');
-        } else {
-        pwdInput.type = "password";
-        eyeIcon.setAttribute('data-lucide', 'eye');
-        }
-        lucide.createIcons();
-        }
-
-        function logDebug(msg, type = 'info') {
-        const logDiv = document.getElementById('debug-log');
-        if(logDiv) {
-        const time = new Date().toLocaleTimeString('ko-KR', { hour12: false });
-        let colorClass = 'text-green-400';
-        if (type === 'recv') colorClass = 'text-blue-300';
-        if (type === 'send') colorClass = 'text-yellow-300';
-        if (type === 'error') colorClass = 'text-red-400';
-
-        logDiv.innerHTML += `<span class="text-gray-500">[${time}]</span> <span class="${colorClass}">${msg}</span><br>`;
-        logDiv.scrollTop = logDiv.scrollHeight;
-        }
-        console.log(msg);
-        }
-
-        let client = null;
-        let loginUserId = '';
-        const deviceList = ['box01', 'box02'];
-        const maxChannels = 12;
-        const allChannels = Array.from({ length: maxChannels }, (_, i) => i + 1);
-
-        const deviceStates = {
-        'box01': { online: false, cfgLoaded: false, cfgSeen: {}, channels: {}, meta: { last_seen: 0, last_connect: 0 } },
-        'box02': { online: false, cfgLoaded: false, cfgSeen: {}, channels: {}, meta: { last_seen: 0, last_connect: 0 } }
-        };
-
-        const channelColorClasses = ['bg-tuya-blue', 'bg-tuya-green', 'bg-tuya-orange', 'bg-tuya-yellow'];
-
-        renderAllDevices();
-
-        function connectMQTT() {
-        const url = document.getElementById('mqtt-url').value.trim();
-        const username = document.getElementById('mqtt-username').value.trim();
-        const password = document.getElementById('mqtt-password').value.trim();
-        const errorText = document.getElementById('login-error');
-
-        if(!url || !username || !password) {
-        errorText.innerText = "접속 정보를 모두 입력하세요.";
-        errorText.classList.remove('hidden');
-        return;
-        }
-
-        setLoading(true);
-        errorText.classList.add('hidden');
-        document.getElementById('debug-log').innerHTML = '';
-
-        const clientId = 'web_control_' + Math.random().toString(16).substring(2, 8);
-
-        const options = {
-        clientId: clientId,
-        username: username,
-        password: password,
-        keepalive: 60,
-        clean: true,
-        reconnectPeriod: 0
-        };
-
-        logDebug(`접속 시도 중... (URL: ${url})`);
-        client = mqtt.connect(url, options);
-
-        client.on('connect', function () {
-        logDebug("✅ 브로커 서버 로그인 성공!");
-        loginUserId = username;
-        setLoading(false);
-        switchToDashboard();
-
-        // 💡 [핵심 수정] 타이밍 이슈(Race Condition) 완벽 차단
-        // 각 기기별로 명확하게 구독을 걸고, 구독이 "완벽히 승인(Granted)"된 직후에만 GET을 날립니다.
-        deviceList.forEach(deviceId => {
-        const baseTopic = `hdh/${deviceId}/`;
-        const topicsToSub = [
-        baseTopic + 'state/full',
-        baseTopic + 'ch/+/state',
-        baseTopic + 'ch/+/cfg',
-        baseTopic + 'meta/online',
-        baseTopic + 'meta/last_seen',
-        baseTopic + 'meta/last_connect'
-        ];
-
-        // 구독 신청
-        client.subscribe(topicsToSub, { qos: 1 }, function(err) {
-        if(!err) {
-        logDebug(`📡 [${deviceId}] 통신망 구독이 서버에 등록되었습니다.`);
-        // 이제 안전하므로 상태를 요청합니다.
-        const reqTopic = baseTopic + 'get/state';
-        logDebug(`📤 [발신] ${deviceId} 상태 요청 -> ${reqTopic}`, 'send');
-        client.publish(reqTopic, "GET", { qos: 1, retain: false });
-        requestChannelConfigs(deviceId);
-        } else {
-        logDebug(`❌ [${deviceId}] 구독 에러 발생: ${err}`, 'error');
-        }
-        });
-        });
-        });
-
-        client.on('error', function (err) {
-        logDebug("❌ 접속 에러 발생", 'error');
-        setLoading(false);
-        errorText.innerHTML = "연결 실패. 비밀번호 오타가 없거나, 8884 포트가 막혔는지 확인하세요.";
-        errorText.classList.remove('hidden');
-        if (client) client.end();
-        });
-
-        // ---------------------------------------------------------
-        // 수신 로직 (파싱 및 디버그 출력)
-        // ---------------------------------------------------------
-        client.on('message', function (topic, message) {
-        const payload = message.toString();
-        logDebug(`📥 [수신] ${topic} : ${payload}`, 'recv');
-
-        const parts = topic.split('/');
-        if (parts[0] !== 'hdh') return;
-
-        const deviceId = parts[1];
-        if (!deviceId || !deviceList.includes(deviceId)) return;
-
-        try {
-        // 전체 상태 파싱
-        if (topic.endsWith('/state/full')) {
-        const data = JSON.parse(payload);
-        if (data.ch && Array.isArray(data.ch)) {
-        data.ch.forEach(c => {
-        updateChannelUI(deviceId, c.n, c.relay, c.mode);
-        if (c.hasOwnProperty('name')) updateChannelConfig(deviceId, c.n, c);
-        });
-        updateOnlineStatus(deviceId, true);
-        }
-        }
-        // 개별 상태 파싱
-        else if (topic.includes('/ch/') && topic.endsWith('/state')) {
-        const chNum = parseInt(parts[3], 10);
-        const data = JSON.parse(payload);
-        if(chNum && data.hasOwnProperty('relay')) {
-        updateChannelUI(deviceId, chNum, data.relay, data.mode);
-        if (data.hasOwnProperty('name')) updateChannelConfig(deviceId, chNum, data);
-        }
-        }
-        // 채널 설정 파싱
-        else if (topic.includes('/ch/') && topic.endsWith('/cfg')) {
-        const chNum = parseInt(parts[3], 10);
-        const data = JSON.parse(payload);
-        if(chNum) {
-        updateChannelConfig(deviceId, chNum, data);
-        }
-        }
-        // 연결 상태 파싱
-        else if (topic.endsWith('/meta/online')) {
-        const data = JSON.parse(payload);
-        updateOnlineStatus(deviceId, data.online);
-        }
-        else if (topic.endsWith('/meta/last_seen')) {
-        const data = JSON.parse(payload);
-        if (data && typeof data.epoch === 'number') deviceStates[deviceId].meta.last_seen = data.epoch;
-        renderDevice(deviceId);
-        }
-        else if (topic.endsWith('/meta/last_connect')) {
-        const data = JSON.parse(payload);
-        if (data && typeof data.epoch === 'number') deviceStates[deviceId].meta.last_connect = data.epoch;
-        renderDevice(deviceId);
-        }
-        } catch (e) {
-        logDebug(`❌ JSON 해석 오류: ${e.message}`, 'error');
-        }
-        });
-        }
-
-        function formatEpoch(epoch) {
-        const n = Number(epoch) || 0;
-        if(!n) return '';
-        const d = new Date(n * 1000);
-        return d.toLocaleString('ko-KR', { hour12: false });
-        }
-
-        function requestAllStates() {
-        if(client && client.connected) {
-        deviceList.forEach(deviceId => {
-        const reqTopic = `hdh/${deviceId}/get/state`;
-        logDebug(`📤 [발신] 수동 상태 요청 -> ${reqTopic}`, 'send');
-        client.publish(reqTopic, "GET", { qos: 1, retain: false });
-        requestChannelConfigs(deviceId);
-        });
-        }
-        }
-
-        function requestChannelConfigs(deviceId) {
-        if(!client || !client.connected) return;
-
-        deviceStates[deviceId].cfgLoaded = false;
-        deviceStates[deviceId].cfgSeen = {};
-        renderDevice(deviceId);
-
-        logDebug(`📤 [발신] ${deviceId} 채널 설정 요청 (CH1-CH${maxChannels})`, 'send');
-        allChannels.forEach(chNum => {
-        const reqTopic = `hdh/${deviceId}/get/ch/${chNum}`;
-        client.publish(reqTopic, "GET", { qos: 1, retain: false });
-        });
-        }
-
-        function disconnectMQTT() {
-        if(client && client.connected) client.end();
-        document.getElementById('dashboard-view').classList.add('hidden');
-        document.getElementById('dashboard-view').classList.remove('opacity-100');
-        document.getElementById('login-view').classList.remove('hidden');
-
-        deviceList.forEach(dev => updateOnlineStatus(dev, false, true));
-        }
-
-        function toggleChannel(deviceId, chNum) {
-        if(!client || !client.connected) {
-        alert("관제 서버와 연결되어 있지 않습니다.");
-        return;
-        }
-
-        if(deviceStates[deviceId] && deviceStates[deviceId].online === false) {
-        alert(`${deviceId} 기기가 오프라인입니다. 아두이노 전원과 와이파이를 확인하세요.`);
-        return;
-        }
-
-        const btnElement = document.getElementById(`btn-${deviceId}-ch${chNum}`);
-        if(btnElement) {
-        btnElement.classList.add('btn-active');
-        setTimeout(() => btnElement.classList.remove('btn-active'), 150);
-        }
-
-        const currentState = deviceStates[deviceId].channels[chNum]?.relay || false;
-        const targetCommand = currentState ? "OFF" : "ON";
-        const topic = `hdh/${deviceId}/ch/${chNum}/cmd`;
-        const payload = loginUserId ? `${targetCommand} ${loginUserId}` : targetCommand;
-
-        logDebug(`📤 [발신] 제어 명령 -> ${topic} : ${payload}`, 'send');
-        client.publish(topic, payload, { qos: 1, retain: false });
-
-        // 즉각적인 시각 피드백
-        updateChannelUI(deviceId, chNum, !currentState, deviceStates[deviceId].channels[chNum]?.mode || 0);
-        }
-
-        function updateChannelUI(deviceId, chNum, isRelayOn, mode) {
-        const channel = ensureChannelState(deviceId, chNum);
-        channel.relay = !!isRelayOn;
-        channel.mode = Number(mode) || 0;
-        renderDevice(deviceId);
-        }
-
-        function updateChannelConfig(deviceId, chNum, data) {
-        const channel = ensureChannelState(deviceId, chNum);
-        deviceStates[deviceId].cfgSeen[chNum] = true;
-        deviceStates[deviceId].cfgLoaded = allChannels.every(num => deviceStates[deviceId].cfgSeen[num]);
-
-        if (data.hasOwnProperty('name')) {
-        channel.name = String(data.name || '').trim();
-        }
-        if (data.hasOwnProperty('pin')) {
-        channel.pin = Number(data.pin);
-        }
-        if (data.hasOwnProperty('lvl')) {
-        channel.lvl = Number(data.lvl);
-        }
-        if (data.hasOwnProperty('init')) {
-        channel.init = Number(data.init);
-        }
-        if (data.hasOwnProperty('mode')) {
-        channel.mode = Number(data.mode) || 0;
-        }
-
-        renderDevice(deviceId);
-        }
-
-        function addChannel(deviceId) {
-        if(!client || !client.connected) {
-        alert("관제 서버와 연결되어 있지 않습니다.");
-        return;
-        }
-        if(deviceStates[deviceId] && deviceStates[deviceId].online === false) {
-        alert(`${deviceId} 기기가 오프라인입니다. 아두이노 전원과 와이파이를 확인하세요.`);
-        return;
-        }
-
-        const chSelect = document.getElementById(`new-${deviceId}-ch`);
-        const pinInput = document.getElementById(`new-${deviceId}-pin`);
-        const nameInput = document.getElementById(`new-${deviceId}-name`);
-        const chNum = parseInt(chSelect?.value, 10);
-        const pin = parseInt(pinInput?.value, 10);
-        const name = (nameInput?.value || '').trim();
-
-        if(!chNum || chNum < 1 || chNum > maxChannels) {
-        setAddError(deviceId, "추가할 채널을 선택하세요.");
-        return;
-        }
-        if(isAssignedChannel(deviceId, chNum)) {
-        setAddError(deviceId, `CH${chNum}은 이미 이름이 지정되어 있습니다.`);
-        return;
-        }
-        if(!Number.isInteger(pin) || pin < 0 || pin > 127) {
-        setAddError(deviceId, "GPIO Pin은 0~127 사이 숫자로 입력하세요.");
-        return;
-        }
-        if(!name) {
-        setAddError(deviceId, "채널 이름을 입력하세요.");
-        return;
-        }
-        if(/\s/.test(name)) {
-        setAddError(deviceId, "현재 펌웨어 형식상 채널 이름에는 공백을 넣을 수 없습니다.");
-        return;
-        }
-        if(getUtf8ByteLength(name) > 15) {
-        setAddError(deviceId, "채널 이름은 UTF-8 기준 15바이트 이하여야 합니다.");
-        return;
-        }
-
-        const pinTopic = `hdh/${deviceId}/cfg/ch/${chNum}/pin`;
-        const nameTopic = `hdh/${deviceId}/cfg/ch/${chNum}/name`;
-        const pinPayload = `${pin} 1 0`;
-
-        logDebug(`📤 [발신] 채널 핀 설정 -> ${pinTopic} : ${pinPayload}`, 'send');
-        client.publish(pinTopic, pinPayload, { qos: 1, retain: false });
-        logDebug(`📤 [발신] 채널 이름 설정 -> ${nameTopic} : ${name}`, 'send');
-        client.publish(nameTopic, name, { qos: 1, retain: false });
-
-        updateChannelConfig(deviceId, chNum, { name, pin, lvl: 1, init: 0, mode: 0 });
-        updateChannelUI(deviceId, chNum, false, 0);
-        setAddError(deviceId, "");
-        pinInput.value = '';
-        nameInput.value = '';
-
-        setTimeout(() => requestChannelConfig(deviceId, chNum), 500);
-        }
-
-        function requestChannelConfig(deviceId, chNum) {
-        if(!client || !client.connected) return;
-        const reqTopic = `hdh/${deviceId}/get/ch/${chNum}`;
-        client.publish(reqTopic, "GET", { qos: 1, retain: false });
-        }
-
-        function ensureChannelState(deviceId, chNum) {
-        if(!deviceStates[deviceId].channels[chNum]) {
-        deviceStates[deviceId].channels[chNum] = { relay: false, mode: 0, name: '' };
-        }
-        return deviceStates[deviceId].channels[chNum];
-        }
-
-        function isAssignedChannel(deviceId, chNum) {
-        const name = deviceStates[deviceId].channels[chNum]?.name;
-        return typeof name === 'string' && name.trim().length > 0;
-        }
-
-        function getAssignedChannels(deviceId) {
-        return allChannels.filter(chNum => isAssignedChannel(deviceId, chNum));
-        }
-
-        function renderAllDevices() {
-        deviceList.forEach(deviceId => renderDevice(deviceId));
-        }
-
-        function renderDevice(deviceId) {
-        renderChannelButtons(deviceId);
-        renderAddChannelOptions(deviceId);
-        lucide.createIcons();
-        }
-
-        function renderChannelIndicators(deviceId) {
-        const indicatorWrap = document.getElementById(`indicators-${deviceId}`);
-        if(!indicatorWrap) return;
-
-        const assignedChannels = getAssignedChannels(deviceId);
-        if(assignedChannels.length === 0) {
-        indicatorWrap.innerHTML = '<span class="text-gray-400">등록된 채널 없음</span>';
-        return;
-        }
-
-        indicatorWrap.innerHTML = assignedChannels.map(chNum => {
-        const channel = ensureChannelState(deviceId, chNum);
-        const on = !!channel.relay;
-        const statusClass = on ? 'text-blue-500 font-bold' : '';
-        return `<span id="ind-${deviceId}-ch${chNum}" class="flex items-center ${statusClass}"><i data-lucide="power" class="w-3 h-3 mr-0.5"></i>${on ? 'ON' : 'OFF'}</span>`;
-        }).join('');
-        }
-
-        function renderChannelButtons(deviceId) {
-        const container = document.getElementById(`channels-${deviceId}`);
-        if(!container) return;
-
-        const assignedChannels = getAssignedChannels(deviceId);
-        if(assignedChannels.length === 0) {
-        container.innerHTML = '<div class="text-center text-xs font-bold text-gray-400 py-5 bg-gray-50 rounded-xl" style="grid-column:1/-1;">이름이 지정된 채널이 없습니다.</div>';
-        return;
-        }
-
-        container.innerHTML = assignedChannels.map(chNum => renderChannelButton(deviceId, chNum)).join('');
-        }
-
-        function renderChannelButton(deviceId, chNum) {
-        const channel = ensureChannelState(deviceId, chNum);
-        const name = escapeHtml(channel.name || `CH${chNum}`);
-        const isRelayOn = !!channel.relay;
-        const mode = Number(channel.mode) || 0;
-        const colorClass = isRelayOn ? getChannelColorClass(chNum) : 'bg-tuya-off';
-        const modeText = getModeText(mode);
-        const modeClass = mode === 0 ? 'hidden' : '';
-
-        return `
-        <button type="button" class="flex flex-col items-center gap-2 cursor-pointer w-full text-center" style="min-height:96px;" onclick="toggleChannel('${deviceId}', ${chNum})">
-            <div id="btn-${deviceId}-ch${chNum}" class="w-12 h-12 rounded-full ${colorClass} flex items-center justify-center text-white btn-shadow btn-transition relative">
-                <i data-lucide="power" class="w-5 h-5"></i>
-                <span id="mode-${deviceId}-ch${chNum}" class="absolute -top-2 -right-4 text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap ${modeClass}">${modeText}</span>
-            </div>
-            <span id="label-${deviceId}-ch${chNum}" class="text-[13px] font-bold text-gray-700 text-center leading-tight w-full" style="word-break:keep-all; overflow-wrap:anywhere;">${name}<br><span class="text-[10px] text-gray-400 font-normal">(CH${chNum})</span></span>
-        </button>`;
-        }
-
-        function renderAddChannelOptions(deviceId) {
-        const select = document.getElementById(`new-${deviceId}-ch`);
-        const button = document.getElementById(`add-${deviceId}-btn`);
-        if(!select || !button) return;
-
-        const current = select.value;
-        const available = allChannels.filter(chNum => !isAssignedChannel(deviceId, chNum));
-
-        if(!deviceStates[deviceId].cfgLoaded) {
-        select.innerHTML = '<option value="">확인 중</option>';
-        select.disabled = true;
-        button.disabled = true;
-        button.classList.add('opacity-50');
-        return;
-        }
-
-        if(available.length === 0) {
-        select.innerHTML = '<option value="">가득 참</option>';
-        select.disabled = true;
-        button.disabled = true;
-        button.classList.add('opacity-50');
-        return;
-        }
-
-        select.disabled = false;
-        button.disabled = false;
-        button.classList.remove('opacity-50');
-        select.innerHTML = available.map(chNum => `<option value="${chNum}">CH${chNum}</option>`).join('');
-        if(available.includes(Number(current))) select.value = current;
-        }
-
-        function getChannelColorClass(chNum) {
-        return channelColorClasses[(chNum - 1) % channelColorClasses.length];
-        }
-
-        function getModeText(mode) {
-        if (mode === 1) return '스케줄';
-        if (mode === 2) return '순환';
-        if (mode === 3) return '인칭';
-        return '모드';
-        }
-
-        function setAddError(deviceId, message) {
-        const errorElement = document.getElementById(`add-error-${deviceId}`);
-        if(!errorElement) return;
-        errorElement.innerText = message;
-        errorElement.classList.toggle('hidden', !message);
-        }
-
-        function getUtf8ByteLength(value) {
-        return new TextEncoder().encode(value).length;
-        }
-
-        function escapeHtml(value) {
-        return String(value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-        }
-
-        function updateOnlineStatus(deviceId, isOnline, forceOffline = false) {
-        deviceStates[deviceId].online = forceOffline ? false : isOnline;
-
-        const card = document.getElementById(`card-${deviceId}`);
-        const badge = document.getElementById(`status-badge-${deviceId}`);
-        if(!card || !badge) return;
-
-        if(isOnline && !forceOffline) {
-        card.classList.remove('device-offline');
-        badge.classList.remove('bg-gray-500', 'bg-red-500');
-        badge.classList.add('bg-green-500');
-        badge.innerText = '온라인';
-        } else {
-        card.classList.add('device-offline');
-        badge.classList.remove('bg-gray-500', 'bg-green-500');
-        badge.classList.add('bg-red-500');
-        const lastSeen = deviceStates[deviceId]?.meta?.last_seen || 0;
-        const lastConnect = deviceStates[deviceId]?.meta?.last_connect || 0;
-        const t = formatEpoch(lastSeen || lastConnect);
-        badge.innerText = t ? `오프라인 (${t})` : '오프라인';
-        }
-        }
-
-        function setLoading(isLoading) {
-        const btnText = document.getElementById('btn-login-text');
-        const spinner = document.getElementById('btn-login-spinner');
-        const btn = document.getElementById('btn-login');
-
-        if(isLoading) {
-        btnText.innerText = "서버 인증 중...";
-        spinner.classList.remove('hidden');
-        btn.disabled = true;
-        btn.classList.add('opacity-80');
-        } else {
-        btnText.innerText = "통합 관제 연결";
-        spinner.classList.add('hidden');
-        btn.disabled = false;
-        btn.classList.remove('opacity-80');
-        }
-        }
-
-        function switchToDashboard() {
-        const loginView = document.getElementById('login-view');
-        const dashboardView = document.getElementById('dashboard-view');
-        loginView.classList.add('hidden');
-        dashboardView.classList.remove('hidden');
-        setTimeout(() => { dashboardView.classList.add('opacity-100'); }, 50);
-        }
-    </script>
+    <!-- 모드별 상세 설정 -->
+    <div id="modal-detail">${detailHTML}</div>
+  `;
+}
+
+function setMode(deviceId, chNum, newMode) {
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/mode`, String(newMode), { qos:1 });
+  log(`📤 ${deviceId}/ch/${chNum}/mode → ${newMode}`, 'log-send');
+  if (!state[deviceId].channels[chNum]) state[deviceId].channels[chNum] = {};
+  state[deviceId].channels[chNum].mode = newMode;
+  renderModal();
+  renderChannelBtn(deviceId, chNum);
+}
+
+// ── 스케줄 설정 UI ──────────────────────────────────
+function renderScheduleCfg(deviceId, chNum, ch) {
+  const list = ch.schedule || [];
+  const rows = list.map(s => `
+    <div class="setting-row flex items-center gap-2">
+      <span class="text-[10px] mono text-slate-400 flex-1">${hm(s.onH,s.onM)} → ${hm(s.offH,s.offM)} <span class="text-slate-600">mask:${s.mask}</span></span>
+      <button class="btn-sm btn-del" onclick="delSchedule('${deviceId}',${chNum},${s.id})">삭제</button>
+    </div>`).join('');
+
+  return `
+    ${list.length===0?'<p class="text-xs text-slate-600 mb-3 text-center">등록된 스케줄 없음</p>':rows}
+    <div class="setting-row mt-2">
+      <p class="text-[10px] font-bold text-slate-400 mb-2">새 스케줄 추가</p>
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <div><label class="text-[9px] text-slate-600">켜는 시각</label><input id="sch-on-${chNum}"  class="input-sm" type="time" value="09:00"></div>
+        <div><label class="text-[9px] text-slate-600">끄는 시각</label><input id="sch-off-${chNum}" class="input-sm" type="time" value="18:00"></div>
+      </div>
+      <div class="mb-2"><label class="text-[9px] text-slate-600">요일 (127=매일)</label><input id="sch-mask-${chNum}" class="input-sm" type="number" min="0" max="127" value="127"></div>
+      <button class="btn-sm btn-add w-full" onclick="addSchedule('${deviceId}',${chNum})">스케줄 추가</button>
+    </div>`;
+}
+
+function addSchedule(deviceId, chNum) {
+  const on   = document.getElementById(`sch-on-${chNum}`)?.value  || '09:00';
+  const off  = document.getElementById(`sch-off-${chNum}`)?.value || '18:00';
+  const mask = document.getElementById(`sch-mask-${chNum}`)?.value || '127';
+  const topic = `hdh/${deviceId}/ch/${chNum}/schedule`;
+  const payload = `${on} ${off} ${mask}`;
+  client?.publish(topic, payload, { qos:1 });
+  log(`📤 schedule ${chNum}: ${payload}`, 'log-send');
+  setTimeout(() => { client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}); }, 400);
+  setTimeout(renderModal, 500);
+}
+
+function delSchedule(deviceId, chNum, id) {
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/schedule/del`, String(id), { qos:1 });
+  log(`📤 schedule_del CH${chNum} id=${id}`, 'log-send');
+  const ch = state[deviceId].channels[chNum];
+  if (ch?.schedule) ch.schedule = ch.schedule.filter(s=>s.id!==id);
+  renderModal();
+}
+
+// ── 순환 설정 UI ──────────────────────────────────
+function renderCirculateCfg(deviceId, chNum, ch) {
+  const list = ch.circulate || [];
+  const rows = list.map(c => `
+    <div class="setting-row flex items-start gap-2">
+      <div class="flex-1">
+        <p class="text-[10px] mono text-slate-300">${hm(c.startH,c.startM)} ~ ${hm(c.endH,c.endM)}</p>
+        <p class="text-[9px] text-slate-500">ON ${secToHMS(c.open)} / OFF ${secToHMS(c.close)} · mask:${c.mask}</p>
+      </div>
+      <button class="btn-sm btn-del" onclick="delCirculate('${deviceId}',${chNum},${c.id})">삭제</button>
+    </div>`).join('');
+
+  return `
+    ${list.length===0?'<p class="text-xs text-slate-600 mb-3 text-center">등록된 순환 없음</p>':rows}
+    <div class="setting-row mt-2">
+      <p class="text-[10px] font-bold text-slate-400 mb-2">새 순환 추가</p>
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <div><label class="text-[9px] text-slate-600">시작 시각</label><input id="cir-s-${chNum}"  class="input-sm" type="time" value="09:00"></div>
+        <div><label class="text-[9px] text-slate-600">종료 시각</label><input id="cir-e-${chNum}"  class="input-sm" type="time" value="18:00"></div>
+        <div><label class="text-[9px] text-slate-600">ON 시간 (초)</label><input id="cir-on-${chNum}" class="input-sm" type="number" value="60"></div>
+        <div><label class="text-[9px] text-slate-600">OFF 시간 (초)</label><input id="cir-off-${chNum}" class="input-sm" type="number" value="1140"></div>
+      </div>
+      <div class="mb-2"><label class="text-[9px] text-slate-600">요일 mask</label><input id="cir-mask-${chNum}" class="input-sm" type="number" min="0" max="127" value="127"></div>
+      <button class="btn-sm btn-add w-full" onclick="addCirculate('${deviceId}',${chNum})">순환 추가</button>
+    </div>`;
+}
+
+function addCirculate(deviceId, chNum) {
+  const s    = document.getElementById(`cir-s-${chNum}`)?.value   || '09:00';
+  const e    = document.getElementById(`cir-e-${chNum}`)?.value   || '18:00';
+  const on   = document.getElementById(`cir-on-${chNum}`)?.value  || '60';
+  const off  = document.getElementById(`cir-off-${chNum}`)?.value || '1140';
+  const mask = document.getElementById(`cir-mask-${chNum}`)?.value|| '127';
+  const payload = `${s} ${e} ${on} ${off} ${mask}`;
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/circulate`, payload, { qos:1 });
+  log(`📤 circulate CH${chNum}: ${payload}`, 'log-send');
+  setTimeout(() => { client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}); }, 400);
+  setTimeout(renderModal, 500);
+}
+
+function delCirculate(deviceId, chNum, id) {
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/circulate/del`, String(id), { qos:1 });
+  log(`📤 circulate_del CH${chNum} id=${id}`, 'log-send');
+  const ch = state[deviceId].channels[chNum];
+  if (ch?.circulate) ch.circulate = ch.circulate.filter(c=>c.id!==id);
+  renderModal();
+}
+
+// ── 인칭 설정 UI ──────────────────────────────────
+function renderInchingCfg(deviceId, chNum, ch) {
+  const sec = Number(ch.inching)||0;
+  return `
+    <div class="setting-row">
+      <p class="text-[10px] text-slate-400 mb-2">ON 명령 후 자동 OFF 시간</p>
+      <p class="text-xs text-slate-300 mb-3">현재: <span class="font-bold text-purple-400">${sec}초</span></p>
+      <div class="flex gap-2">
+        <input id="inch-sec-${chNum}" class="input-sm" type="number" min="1" value="${sec||5}" placeholder="초">
+        <button class="btn-sm btn-add" onclick="setInching('${deviceId}',${chNum})">적용</button>
+      </div>
+    </div>`;
+}
+
+function setInching(deviceId, chNum) {
+  const sec = document.getElementById(`inch-sec-${chNum}`)?.value || '5';
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/inching`, sec, { qos:1 });
+  log(`📤 inching CH${chNum}: ${sec}초`, 'log-send');
+  if (state[deviceId].channels[chNum]) state[deviceId].channels[chNum].inching = Number(sec);
+  renderModal();
+}
+</script>
 </body>
 </html>
