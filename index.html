@@ -347,16 +347,39 @@ function addChannel(deviceId){
 
 // ── 설정 모달 ──
 let _ctx=null;
-function openCfg(deviceId,chNum){_ctx={deviceId,chNum};renderModal();document.getElementById('cfg-modal').classList.remove('hidden');}
-function closeModal(){document.getElementById('cfg-modal').classList.add('hidden');_ctx=null;}
+let _modalTab=null; // 'cfg' | 0(수동) | 1(스케줄) | 2(순환) | 3(인칭)
+
+function openCfg(deviceId,chNum){
+  _ctx={deviceId,chNum};
+  _modalTab=null; // null → 현재 모드 탭으로 자동 이동
+  renderModal();
+  document.getElementById('cfg-modal').classList.remove('hidden');
+}
+function closeModal(){
+  document.getElementById('cfg-modal').classList.add('hidden');
+  _ctx=null; _modalTab=null;
+}
+function switchModalTab(tab){
+  _modalTab=tab;
+  if(typeof tab==='number') setMode(_ctx.deviceId,_ctx.chNum,tab);
+  else renderModal();
+}
+
 function renderModal(){
   if(!_ctx)return;
   const {deviceId,chNum}=_ctx;
   const ch=state[deviceId].channels[chNum]||{};
   const mode=Number(ch.mode)||0;
+  const tab=_modalTab!==null?_modalTab:mode;
   const mN=['수동','스케줄','순환','인칭'];
-  const detail=mode===1?schUI(deviceId,chNum,ch):mode===2?cirUI(deviceId,chNum,ch):mode===3?inchUI(deviceId,chNum,ch)
-    :`<p class="text-xs text-slate-400 text-center py-3">수동 모드 — 버튼으로 직접 ON/OFF 제어합니다.</p>`;
+
+  let detail;
+  if(tab==='cfg') detail=chCfgUI(deviceId,chNum,ch);
+  else if(tab===1) detail=schUI(deviceId,chNum,ch);
+  else if(tab===2) detail=cirUI(deviceId,chNum,ch);
+  else if(tab===3) detail=inchUI(deviceId,chNum,ch);
+  else detail=`<p class="text-xs text-slate-400 text-center py-3">수동 모드 — 버튼으로 직접 ON/OFF 제어합니다.</p>`;
+
   const hex=chHex(chNum);
   document.getElementById('modal-content').innerHTML=`
     <div class="flex items-center gap-3 mb-5">
@@ -366,12 +389,13 @@ function renderModal(){
         </svg>
       </div>
       <div>
-        <p class="font-bold text-slate-800">${esc(ch.name||'CH'+chNum)} <span class="text-slate-400 text-xs font-normal">CH${chNum}</span></p>
+        <p class="font-bold text-slate-800">${esc(ch.name||'CH'+chNum)} <span class="text-slate-400 text-xs font-normal">CH${chNum} · pin${ch.pin??'?'}</span></p>
         <p class="text-[11px] text-slate-400">현재 ${mN[mode]} 모드</p>
       </div>
     </div>
     <div class="flex gap-2 flex-wrap mb-4">
-      ${[0,1,2,3].map(m=>`<button class="mode-tab${mode===m?' active':''}" onclick="setMode('${deviceId}',${chNum},${m})">${mN[m]}</button>`).join('')}
+      <button class="mode-tab${tab==='cfg'?' active':''}" style="${tab==='cfg'?'':''}; ${tab==='cfg'?'background:#0f172a;color:#fff;border-color:#0f172a':''}" onclick="switchModalTab('cfg')">⚙ 채널설정</button>
+      ${[0,1,2,3].map(m=>`<button class="mode-tab${tab===m?' active':''}" onclick="switchModalTab(${m})">${mN[m]}</button>`).join('')}
     </div>
     <div id="modal-detail">${detail}</div>`;
 }
@@ -379,7 +403,96 @@ function setMode(deviceId,chNum,m){
   client?.publish(`hdh/${deviceId}/ch/${chNum}/mode`,String(m),{qos:1});
   log(`📤 ${deviceId}/ch/${chNum}/mode → ${m}`,'ls');
   state[deviceId].channels[chNum]={...(state[deviceId].channels[chNum]||{}),mode:m};
+  _modalTab=m;
   renderModal(); renderChBtn(deviceId,chNum);
+}
+
+// ── 채널 기본 설정 UI ──
+function chCfgUI(deviceId,chNum,ch){
+  const pin=ch.pin??0;
+  const init=ch.init??0;
+  return`
+  <div class="setting-row mb-3">
+    <p class="text-[10px] font-bold text-slate-500 mb-2">채널 이름</p>
+    <p class="text-[9px] text-slate-400 mb-2">최대 15바이트 (한글 5자)</p>
+    <div class="flex gap-2">
+      <input id="cfg-name-${chNum}" class="input-sm flex-1" value="${esc(ch.name||'')}" maxlength="15" placeholder="채널 이름">
+      <button class="btn-sm btn-add" onclick="saveName('${deviceId}',${chNum})">저장</button>
+    </div>
+    <p id="cfg-name-err-${chNum}" class="text-red-500 text-[9px] mt-1 hidden"></p>
+  </div>
+  <div class="setting-row mb-3">
+    <p class="text-[10px] font-bold text-slate-500 mb-2">GPIO 핀 설정</p>
+    <div class="grid grid-cols-2 gap-2 mb-2">
+      <div>
+        <label class="text-[9px] text-slate-400">GPIO 번호 (0~127)</label>
+        <input id="cfg-pin-${chNum}" class="input-sm" type="number" min="0" max="127" value="${pin}">
+      </div>
+      <div>
+        <label class="text-[9px] text-slate-400">전원 켤 때 초기 상태</label>
+        <select id="cfg-init-${chNum}" class="input-sm">
+          <option value="0" ${init===0?'selected':''}>OFF</option>
+          <option value="1" ${init===1?'selected':''}>ON</option>
+        </select>
+      </div>
+    </div>
+    <p class="text-[9px] text-slate-400 mb-2">※ 릴레이 레벨: HIGH=ON (고정)</p>
+    <button class="btn-sm btn-add w-full" onclick="savePin('${deviceId}',${chNum})">핀 설정 저장</button>
+    <p id="cfg-pin-err-${chNum}" class="text-red-500 text-[9px] mt-1 hidden"></p>
+  </div>
+  <div class="setting-row" style="background:#fff5f5;border:1px solid #fecaca;border-radius:12px;">
+    <p class="text-[10px] font-bold text-red-500 mb-1">⚠ 채널 삭제</p>
+    <p class="text-[10px] text-slate-500 mb-3">이름·핀·스케줄·순환 설정이 모두 초기화됩니다.</p>
+    <button class="btn-sm btn-del w-full" onclick="confirmDeleteChannel('${deviceId}',${chNum})">CH${chNum} 삭제</button>
+  </div>`;
+}
+
+function saveName(deviceId,chNum){
+  const val=document.getElementById(`cfg-name-${chNum}`).value.trim();
+  const errEl=document.getElementById(`cfg-name-err-${chNum}`);
+  const setErr=m=>{errEl.textContent=m;errEl.classList.toggle('hidden',!m);};
+  setErr('');
+  if(!val) return setErr('이름을 입력하세요.');
+  if(new TextEncoder().encode(val).length>15) return setErr('15바이트 초과 (한글 최대 5자).');
+  client?.publish(`hdh/${deviceId}/cfg/ch/${chNum}/name`,val,{qos:1});
+  log(`📤 name CH${chNum} → ${val}`,'ls');
+  state[deviceId].channels[chNum]={...(state[deviceId].channels[chNum]||{}),name:val};
+  renderModal();
+  renderDevice(deviceId);
+}
+
+function savePin(deviceId,chNum){
+  const pin=parseInt(document.getElementById(`cfg-pin-${chNum}`).value);
+  const init=parseInt(document.getElementById(`cfg-init-${chNum}`).value);
+  const errEl=document.getElementById(`cfg-pin-err-${chNum}`);
+  const setErr=m=>{errEl.textContent=m;errEl.classList.toggle('hidden',!m);};
+  setErr('');
+  if(!Number.isInteger(pin)||pin<0||pin>127) return setErr('GPIO: 0~127');
+  const payload=`${pin} 1 ${init}`;  // activeLevel 항상 1 (HIGH=ON)
+  client?.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,payload,{qos:1});
+  log(`📤 pin CH${chNum} → ${payload}`,'ls');
+  state[deviceId].channels[chNum]={...(state[deviceId].channels[chNum]||{}),pin,init};
+  renderModal();
+}
+
+function confirmDeleteChannel(deviceId,chNum){
+  const ch=state[deviceId].channels[chNum]||{};
+  const name=ch.name||`CH${chNum}`;
+  if(!confirm(`"${name}" 채널을 삭제하시겠습니까?\n모든 설정이 초기화됩니다.`)) return;
+  deleteChannel(deviceId,chNum);
+}
+function deleteChannel(deviceId,chNum){
+  // 1) 모드 초기화 (스케줄/순환/인칭 클리어)
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/clear`,'1',{qos:1});
+  // 2) 이름 공백 → 아두이노가 빈 이름 채널은 state/full에서 제외
+  client?.publish(`hdh/${deviceId}/cfg/ch/${chNum}/name`,'',{qos:1});
+  // 3) 핀 255(0xFF) → 미설정 표시
+  client?.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,'255 1 0',{qos:1});
+  log(`📤 CH${chNum} 삭제`,'ls');
+  // 로컬 상태 제거
+  delete state[deviceId].channels[chNum];
+  closeModal();
+  renderDevice(deviceId);
 }
 
 // ── 스케줄 ──
