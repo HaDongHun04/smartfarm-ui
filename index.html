@@ -285,6 +285,9 @@ function onMessage(topic, buf){
       const data = JSON.parse(payload);
       (data.ch||[]).forEach(ch=>{state[deviceId].channels[ch.n]={...(state[deviceId].channels[ch.n]||{}),...ch};});
       clearTimeout(_retryTimers[deviceId]);
+      // ★ state/full 수신 = 장치가 응답하고 있음 → 온라인 강제 설정
+      // (브로커에 LWT retain이 남아있어도 실제 동작 중이면 온라인으로 표시)
+      setOnline(deviceId, true);
       renderDevice(deviceId); return;
     }
     const m = topic.match(/\/ch\/(\d+)\/state$/);
@@ -314,6 +317,9 @@ function requestAllStates(){
 
 // ── 카드 생성 ──
 function buildDeviceCards(){
+  const active = registry.filter(r=>r.enabled!==false);
+  const inactive = registry.filter(r=>r.enabled===false);
+
   if(registry.length===0){
     document.getElementById('device-cards').innerHTML=`
       <div class="card text-center py-8">
@@ -323,7 +329,8 @@ function buildDeviceCards(){
       </div>`;
     return;
   }
-  document.getElementById('device-cards').innerHTML = registry.map(r=>`
+
+  const activeCards = active.map(r=>`
     <div id="card-${r.id}" class="card mb-4">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
@@ -333,7 +340,14 @@ function buildDeviceCards(){
             <p id="meta-${r.id}" class="text-[10px] text-slate-400 mt-0.5">—</p>
           </div>
         </div>
-        <span id="badge-${r.id}" class="badge badge-chk">확인 중</span>
+        <div class="flex items-center gap-2">
+          <span id="badge-${r.id}" class="badge badge-chk">확인 중</span>
+          <!-- 카드 내 빠른 비활성화 토글 -->
+          <button onclick="toggleRegEnabled('${r.id}')" title="비활성화"
+                  style="width:32px;height:18px;border-radius:9px;border:none;cursor:pointer;background:#3b82f6;position:relative;flex-shrink:0">
+            <span style="position:absolute;top:1px;left:15px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+          </button>
+        </div>
       </div>
       <div id="channels-${r.id}" class="grid grid-cols-3 gap-4 min-h-[72px]">
         <div class="col-span-3 text-center text-xs text-slate-400 py-4">상태 조회 중...</div>
@@ -350,6 +364,19 @@ function buildDeviceCards(){
         <p id="add-err-${r.id}" class="text-red-500 text-[10px] font-bold mt-1 hidden"></p>
       </div>
     </div>`).join('');
+
+  // 비활성 기기는 접힌 요약 행으로만 표시
+  const inactiveSection = inactive.length===0?'':
+    `<div class="card mb-4" style="opacity:.6">
+      <p class="text-[10px] font-bold text-slate-400 mb-2">⏸ 비활성 기기 (${inactive.length}개)</p>
+      ${inactive.map(r=>`
+        <div class="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+          <span class="text-[11px] text-slate-500">${esc(r.id)} <span class="text-slate-400">${esc(r.label||'')}</span></span>
+          <button onclick="toggleRegEnabled('${r.id}')" class="btn-sm btn-add" style="font-size:10px;padding:4px 10px;">활성화</button>
+        </div>`).join('')}
+    </div>`;
+
+  document.getElementById('device-cards').innerHTML = activeCards + inactiveSection;
 }
 
 // ── 렌더링 ──
@@ -457,6 +484,7 @@ function closeRegistryModal(){
 function renderRegistryModal(){
   const rows = registry.map((r,i)=>{
     const editing = _regEditId === r.id;
+    const enabled = r.enabled !== false; // 기본값 true
     if(editing){
       return `
       <div class="reg-row editing">
@@ -469,11 +497,16 @@ function renderRegistryModal(){
       </div>`;
     }
     return `
-    <div class="reg-row">
+    <div class="reg-row" style="${enabled?'':'opacity:.5'}">
       <div class="flex-1 min-w-0">
-        <p class="text-[11px] font-bold text-slate-700 truncate">${esc(r.id)}</p>
+        <p class="text-[11px] font-bold text-slate-700 truncate">${esc(r.id)} ${enabled?'':'<span class="text-[9px] text-slate-400">(비활성)</span>'}</p>
         <p class="text-[10px] text-slate-400 truncate">${esc(r.label||'설명 없음')}</p>
       </div>
+      <!-- ON/OFF 토글 -->
+      <button onclick="toggleRegEnabled('${r.id}')" title="${enabled?'비활성화':'활성화'}"
+              style="width:36px;height:20px;border-radius:10px;border:none;cursor:pointer;transition:background .2s;flex-shrink:0;position:relative;background:${enabled?'#3b82f6':'#e2e8f0'}">
+        <span style="position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;left:${enabled?'18px':'2px'};box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+      </button>
       <button class="btn-sm btn-gray" onclick="startRegEdit('${r.id}')">수정</button>
       <button class="btn-sm btn-del" onclick="deleteRegEntry('${r.id}')">삭제</button>
     </div>`;
@@ -506,6 +539,16 @@ function renderRegistryModal(){
       <p class="text-[10px] font-bold text-amber-700 mb-1">⚠ retain 저장 안내</p>
       <p class="text-[10px] text-amber-600">추가/수정/삭제 즉시 HiveMQ에 retain 저장됩니다. 다음 접속 시 자동으로 복원됩니다.</p>
     </div>`;
+}
+
+function toggleRegEnabled(id){
+  const r = registry.find(r=>r.id===id);
+  if(!r) return;
+  r.enabled = !r.enabled;
+  saveRegistry();
+  buildDeviceCards();
+  renderRegistryModal();
+  log(`${r.enabled?'✅':'⏸'} [${id}] ${r.enabled?'활성화':'비활성화'}`, 'lx');
 }
 
 function startRegEdit(id){
@@ -555,7 +598,7 @@ function addRegEntry(){
   if(!/^[a-zA-Z0-9_-]+$/.test(id)) return setErr('ID는 영문·숫자·_·- 만 가능합니다.');
   if(registry.some(r=>r.id===id)) return setErr('이미 존재하는 ID입니다.');
 
-  registry.push({id, label});
+  registry.push({id, label, enabled:true});
   state[id] = {online:false, lastSeen:0, channels:{}};
   saveRegistry();
   buildDeviceCards();
