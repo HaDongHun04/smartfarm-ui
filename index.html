@@ -156,6 +156,8 @@ function secLabel(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),r=s%60
 function chHex(n){return COL[(n-1)%COL.length];}
 function deviceIds(){return registry.map(r=>r.id);}
 function deviceLabel(id){return (registry.find(r=>r.id===id)||{}).label||id;}
+// 펌웨어 자동생성 ID('$' 접두) — 메인 화면 카드에는 표시하지 않음, 기기 목록 관리만
+function isHiddenDeviceId(id){return String(id||'').startsWith('$');}
 
 // ── 레지스트리 저장 (retain) ──
 function saveRegistry(){
@@ -317,10 +319,11 @@ function requestAllStates(){
 
 // ── 카드 생성 ──
 function buildDeviceCards(){
-  const active = registry.filter(r=>r.enabled!==false);
-  const inactive = registry.filter(r=>r.enabled===false);
+  const visible = registry.filter(r=>!isHiddenDeviceId(r.id));
+  const active = visible.filter(r=>r.enabled!==false);
+  const inactive = visible.filter(r=>r.enabled===false);
 
-  if(registry.length===0){
+  if(visible.length===0){
     document.getElementById('device-cards').innerHTML=`
       <div class="card text-center py-8">
         <p class="text-slate-400 text-sm font-bold mb-1">등록된 기기가 없습니다</p>
@@ -496,10 +499,11 @@ function renderRegistryModal(){
         <button class="btn-sm btn-gray" onclick="cancelRegEdit()">취소</button>
       </div>`;
     }
+    const hidden = isHiddenDeviceId(r.id);
     return `
     <div class="reg-row" style="${enabled?'':'opacity:.5'}">
       <div class="flex-1 min-w-0">
-        <p class="text-[11px] font-bold text-slate-700 truncate">${esc(r.id)} ${enabled?'':'<span class="text-[9px] text-slate-400">(비활성)</span>'}</p>
+        <p class="text-[11px] font-bold text-slate-700 truncate">${esc(r.id)} ${hidden?'<span class="text-[9px] text-amber-600">(자동ID·메인 미표시)</span>':(enabled?'':'<span class="text-[9px] text-slate-400">(비활성)</span>')}</p>
         <p class="text-[10px] text-slate-400 truncate">${esc(r.label||'설명 없음')}</p>
       </div>
       <!-- ON/OFF 토글 -->
@@ -563,26 +567,33 @@ function saveRegEdit(oldId){
   const newId = document.getElementById('reg-edit-id').value.trim();
   const newLabel = document.getElementById('reg-edit-label').value.trim();
   if(!newId){ alert('기기 ID를 입력하세요.'); return; }
-  if(!/^[a-zA-Z0-9_-]+$/.test(newId)){ alert('ID는 영문·숫자·_·- 만 가능합니다.'); return; }
+  if(!/^[a-zA-Z0-9_$-]+$/.test(newId)){ alert('ID는 영문·숫자·_·-·$ 만 가능합니다.'); return; }
   if(newId !== oldId && registry.some(r=>r.id===newId)){ alert('이미 존재하는 ID입니다.'); return; }
 
   const idx = registry.findIndex(r=>r.id===oldId);
   if(idx<0) return;
 
-  // ID 변경 시 state도 이전
+  // ID 변경: 펌웨어 EEPROM도 갱신 (옛 ID 토픽으로 cfg/id 전송)
   if(newId !== oldId){
+    if(client?.connected){
+      client.publish(`hdh/${oldId}/cfg/id`, newId, {qos:1});
+      log(`📤 [${oldId}] cfg/id → ${newId} (펌웨어 ID)`, 'ls');
+    } else {
+      alert('MQTT 미연결 — 펌웨어 ID는 변경되지 않았습니다. 연결 후 다시 시도하세요.');
+      return;
+    }
     state[newId] = state[oldId]||{online:false,lastSeen:0,channels:{}};
     delete state[oldId];
     clearTimeout(_retryTimers[oldId]);
     delete _retryTimers[oldId];
   }
 
-  registry[idx] = {id:newId, label:newLabel};
+  const prev = registry[idx];
+  registry[idx] = {id:newId, label:newLabel, enabled:prev.enabled!==false};
   _regEditId = null;
   saveRegistry();
   buildDeviceCards();
 
-  // ID 바뀐 경우 새 기기 구독
   if(newId !== oldId) subscribeDevice(newId);
 
   renderRegistryModal();
@@ -595,7 +606,7 @@ function addRegEntry(){
   const setErr = m=>{errEl.textContent=m; errEl.classList.toggle('hidden',!m);};
   setErr('');
   if(!id) return setErr('기기 ID를 입력하세요.');
-  if(!/^[a-zA-Z0-9_-]+$/.test(id)) return setErr('ID는 영문·숫자·_·- 만 가능합니다.');
+  if(!/^[a-zA-Z0-9_$-]+$/.test(id)) return setErr('ID는 영문·숫자·_·-·$ 만 가능합니다.');
   if(registry.some(r=>r.id===id)) return setErr('이미 존재하는 ID입니다.');
 
   registry.push({id, label, enabled:true});
