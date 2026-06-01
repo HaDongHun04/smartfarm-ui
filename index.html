@@ -594,6 +594,7 @@ function saveRegEdit(oldId){
   saveRegistry();
   buildDeviceCards();
 
+  // ID 바뀐 경우 새 기기 구독
   if(newId !== oldId) subscribeDevice(newId);
 
   renderRegistryModal();
