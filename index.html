@@ -16,11 +16,7 @@
   .btn-primary:hover{background:#2563eb;} .btn-primary:active{transform:scale(.98);}
   .ch-btn{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;}
   .ch-circle{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s;position:relative;box-shadow:0 2px 6px rgba(0,0,0,.1);z-index:1;}
-  .ch-circle.off{background:#e2e8f0;}
-  .ch-circle.on{box-shadow:0 4px 14px rgba(0,0,0,.2);}
-  .ch-circle.pending{opacity:.55;animation:pulse .6s ease-in-out infinite;}
-  @keyframes pulse{0%,100%{opacity:.55}50%{opacity:.85}}
-  .ch-circle:active{transform:scale(.92);}
+  .ch-circle.off{background:#e2e8f0;} .ch-circle.on{box-shadow:0 4px 14px rgba(0,0,0,.2);} .ch-circle:active{transform:scale(.92);}
   .ch-gear{position:absolute;bottom:-5px;right:-5px;width:19px;height:19px;background:#fff;border:1.5px solid #e2e8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.1);transition:all .15s;}
   .ch-gear:hover{background:#3b82f6;border-color:#3b82f6;} .ch-gear:hover .gear-icon{color:#fff;}
   .mode-tag{position:absolute;top:-9px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;white-space:nowrap;pointer-events:none;z-index:2;}
@@ -384,10 +380,8 @@ function disconnectMQTT(){
 function onMessage(topic, buf){
   const payload = buf.toString();
 
-  // 레지스트리 수신
-  if(topic === REGISTRY_TOPIC){
-
-  // ★ auth/error: 아두이노 PIN 검증 실패 → 웹에 에러 표시
+  // ── 글로벌 토픽 먼저 처리 ────────────────────────────────────────
+  // auth/error: 아두이노 PIN 검증 실패
   if(topic.endsWith('/auth/error')){
     try{
       const data = JSON.parse(payload);
@@ -396,15 +390,15 @@ function onMessage(topic, buf){
     }catch(e){ showAuthError('PIN 검증 실패'); }
     return;
   }
+  // auth/ok: PIN 변경 성공
   if(topic.endsWith('/auth/ok')){
     log(`✅ PIN 검증 성공`, 'lr');
-    // 설정 모달 닫기 + 상태 갱신
     closeModal();
     const deviceId = topic.split('/')[1];
     setTimeout(()=>client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}),300);
     return;
   }
-
+  // 레지스트리 수신
   if(topic === REGISTRY_TOPIC){
     try{
       const list = JSON.parse(payload||'[]');
@@ -433,11 +427,6 @@ function onMessage(topic, buf){
     if(m){
       const n=parseInt(m[1]), d=JSON.parse(payload);
       state[deviceId].channels[n]={...(state[deviceId].channels[n]||{}), relay:d.relay, mode:d.mode};
-      // ★ Arduino가 실제로 응답한 시점에만 색깔 업데이트
-      // pending 타이머 해제 → 깜빡임 중단 → renderChBtn이 확정 색깔로 교체
-      const key=`${deviceId}:${n}`;
-      clearTimeout(_pendingCh.get(key));
-      _pendingCh.delete(key);
       renderChBtn(deviceId,n); return;
     }
     if(topic.endsWith('/meta/online')){setOnline(deviceId,!!JSON.parse(payload).online);return;}
@@ -576,32 +565,15 @@ function setOnline(deviceId,online){
 }
 
 // ── 채널 토글 ──
-// ── pending 채널 추적 (cmd 전송 후 Arduino 확인 대기 중인 채널) ────
-const _pendingCh = new Map();  // key: "deviceId:chNum", value: timer
-
 function toggleChannel(deviceId,chNum){
   if(!client?.connected)return;
   const ch=state[deviceId]?.channels[chNum];
   const payload=ch?.relay?'OFF':'ON';
-
-  // 1) MQTT 전송
   client.publish(`hdh/${deviceId}/ch/${chNum}/cmd`,payload,{qos:1});
   log(`📤 ${deviceId}/ch/${chNum}/cmd → ${payload}`,'ls');
-
-  // 2) pending 상태 표시 (Arduino 확인 전까지 깜빡임)
-  //    실제 색깔 변경은 ch/{n}/state 수신 시점에만 적용됨
-  const key = `${deviceId}:${chNum}`;
-  const el = document.getElementById(`chbtn-${deviceId}-${chNum}`);
-  const circle = el?.querySelector('.ch-circle');
-  if(circle) circle.classList.add('pending');
-
-  // 3) 2초 후에도 Arduino 응답 없으면 pending 해제 (타임아웃)
-  clearTimeout(_pendingCh.get(key));
-  _pendingCh.set(key, setTimeout(()=>{
-    const c = document.getElementById(`chbtn-${deviceId}-${chNum}`)?.querySelector('.ch-circle');
-    if(c) c.classList.remove('pending');
-    _pendingCh.delete(key);
-  }, 2000));
+  if(!state[deviceId]) state[deviceId]={online:false,lastSeen:0,channels:{}};
+  state[deviceId].channels[chNum]={...(ch||{}),relay:!ch?.relay};
+  renderChBtn(deviceId,chNum);
 }
 
 // ── 채널 추가 ──
