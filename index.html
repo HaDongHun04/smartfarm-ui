@@ -380,8 +380,7 @@ function disconnectMQTT(){
 function onMessage(topic, buf){
   const payload = buf.toString();
 
-  // ── 글로벌 토픽 먼저 처리 ────────────────────────────────────────
-  // auth/error: 아두이노 PIN 검증 실패
+  // ── 글로벌 토픽 처리 (deviceId 불필요) ──────────────────────────
   if(topic.endsWith('/auth/error')){
     try{
       const data = JSON.parse(payload);
@@ -390,7 +389,6 @@ function onMessage(topic, buf){
     }catch(e){ showAuthError('PIN 검증 실패'); }
     return;
   }
-  // auth/ok: PIN 변경 성공
   if(topic.endsWith('/auth/ok')){
     log(`✅ PIN 검증 성공`, 'lr');
     closeModal();
@@ -398,7 +396,6 @@ function onMessage(topic, buf){
     setTimeout(()=>client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}),300);
     return;
   }
-  // 레지스트리 수신
   if(topic === REGISTRY_TOPIC){
     try{
       const list = JSON.parse(payload||'[]');
