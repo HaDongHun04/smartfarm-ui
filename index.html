@@ -251,6 +251,88 @@ function showAuthError(msg) {
 //  형식: [{"id":"box01","label":"담액식"}, ...]
 // ════════════════════════════════════════════
 const REGISTRY_TOPIC = 'hdh/registry';
+
+// ════════════════════════════════════════════
+//  Audit — 사용자 조작 로그 (Firebase Realtime DB 전담)
+// ════════════════════════════════════════════
+// 아두이노는 제어만 담당. 로그 저장/조회는 Firebase가 처리.
+window._auditUser  = '';         // MQTT 로그인 시 설정
+window._auditIp    = 'unknown';  // 공인 IP (시작 시 1회 조회)
+window._auditAgent = 'unknown';  // 브라우저/기기 요약
+
+function _parseAgent(ua){
+  if(/iPhone/.test(ua)) return 'iPhone';
+  if(/iPad/.test(ua))   return 'iPad';
+  if(/Android/.test(ua)){const m=ua.match(/;\s*([^)]+)\)/);return m?m[1].trim().slice(0,18):'Android';}
+  if(/Windows NT 10/.test(ua)) return 'Win10';
+  if(/Windows/.test(ua))       return 'Windows';
+  if(/Macintosh/.test(ua))     return 'Mac';
+  return 'PC';
+}
+async function _initAudit(){
+  window._auditAgent = _parseAgent(navigator.userAgent);
+  try{
+    const r = await fetch('https://api.ipify.org?format=json');
+    window._auditIp = (await r.json()).ip;
+  }catch{ window._auditIp = 'unknown'; }
+}
+
+// ── 모든 MQTT 명령의 기본 전송 함수 ──────────────────────────────
+// 기존 client.publish() 대신 이 함수를 사용하면 Firebase에 자동 기록됨
+function publishCmd(deviceId, topic, payload, cmdDesc){
+  if(!client?.connected) return;
+  client.publish(topic, payload, {qos:1});
+  log(`📤 ${topic.split('/').slice(2).join('/')} → ${String(payload).slice(0,30)}`,'ls');
+  // Firebase 로그 기록 (Firebase 모듈이 로드된 경우에만)
+  window.fbLog?.(deviceId, cmdDesc || String(payload).slice(0, 50));
+}
+
+// ── 조작 기록 모달 ────────────────────────────────────────────────
+async function showAuditLog(deviceId){
+  // 바텀시트 먼저 띄우고 로딩 표시
+  if(document.getElementById('audit-modal')) return;
+  const div = document.createElement('div');
+  div.id = 'audit-modal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:100;display:flex;align-items:flex-end;justify-content:center;';
+  div.innerHTML = `
+    <div style="background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:480px;max-height:82vh;display:flex;flex-direction:column;padding:20px 18px 36px;">
+      <div style="width:44px;height:5px;background:#e2e8f0;border-radius:3px;margin:0 auto 16px;cursor:pointer;" onclick="closeAuditModal()"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-shrink:0;">
+        <p style="font-weight:800;font-size:14px;color:#0f172a;">📋 조작 기록 — ${deviceId}</p>
+        <button onclick="closeAuditModal()" style="background:#f1f5f9;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;color:#94a3b8;">✕</button>
+      </div>
+      <div id="audit-body" style="overflow-y:auto;flex:1;font-size:11px;color:#334155;">
+        <p style="text-align:center;padding:20px;color:#94a3b8;">⏳ Firebase에서 불러오는 중…</p>
+      </div>
+    </div>`;
+  div.onclick = e => { if(e.target===div) closeAuditModal(); };
+  document.body.appendChild(div);
+
+  // Firebase에서 최근 50건 조회
+  const logs = await window.fbGetLogs?.(deviceId);
+  const body = document.getElementById('audit-body');
+  if(!body) return;
+
+  if(logs === null){
+    body.innerHTML = '<p style="text-align:center;padding:16px;color:#ef4444;">Firebase 연결 실패</p>';
+    return;
+  }
+  if(logs.length === 0){
+    body.innerHTML = '<p style="text-align:center;padding:16px;color:#94a3b8;">(기록 없음)</p>';
+    return;
+  }
+  body.innerHTML = logs.map(r=>`
+    <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <span style="font-weight:700;color:#0f172a;">${r.u||'?'}</span>
+        <span style="color:#94a3b8;">${r.t||''}</span>
+      </div>
+      <div style="color:#3b82f6;font-weight:600;">→ ${r.cmd||''}</div>
+      <div style="color:#94a3b8;font-size:10px;">${r.dv||''} · ${r.ip||''}</div>
+    </div>`).join('');
+}
+function closeAuditModal(){ document.getElementById('audit-modal')?.remove(); }
+// ─────────────────────────────────────────────────────────────────
 const COL = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#06b6d4','#f43f5e'];
 
 // 동적 기기 목록 (레지스트리에서 로드)
@@ -272,6 +354,12 @@ function deviceLabel(id){return (registry.find(r=>r.id===id)||{}).label||id;}
 // ── 레지스트리 저장 (retain) ──
 function saveRegistry(){
   if(!client?.connected) return;
+  // ★ 안전장치: 빈 배열을 retain으로 덮어쓰면 모든 기기 목록이 사라짐
+  // → registry가 실제로 비어있더라도 최소 1개 이상일 때만 저장
+  if(registry.length === 0) {
+    log('⚠️ registry가 비어있어 저장 건너뜀 (기기 목록 보호)', 'lx');
+    return;
+  }
   const payload = JSON.stringify(registry);
   client.publish(REGISTRY_TOPIC, payload, {qos:1, retain:true});
   log(`📤 registry 저장 (${registry.length}개)`, 'ls');
@@ -325,6 +413,8 @@ function connectMQTT(){
   const url=document.getElementById('mqtt-url').value.trim();
   const user=document.getElementById('mqtt-username').value.trim();
   const pass=document.getElementById('mqtt-password').value;
+  window._auditUser = user;   // ★ 조작 로그에 사용할 사용자명
+  _initAudit();               // ★ 공인 IP 비동기 조회 (백그라운드)
   const errEl=document.getElementById('login-error');
   errEl.classList.add('hidden');
   document.getElementById('btn-login-text').textContent='연결 중...';
@@ -347,12 +437,16 @@ function connectMQTT(){
     client.subscribe('hdh/+/auth/error', {qos:1});
     client.subscribe('hdh/+/auth/ok',    {qos:1});
 
-    // 3초 내 registry 미수신 시 빈 목록으로 시작
+    // 3초 내 registry 미수신 시
+    // ★ applyRegistry([]) 호출 금지 — registry 변수를 비우면
+    //    이후 saveRegistry()가 빈 배열을 덮어쓸 위험이 있음
+    // → UI만 처리하고 registry는 빈 배열로 초기화
     _registryTimeout = setTimeout(()=>{
       if(!_registryReceived){
-        log('⚠️ registry retain 없음 — 빈 목록으로 시작', 'lx');
+        log('⚠️ registry retain 없음 — 빈 목록으로 시작 (HiveMQ에 저장 안 함)', 'lx');
         document.getElementById('registry-loading').classList.add('hidden');
-        applyRegistry([]);
+        registry = [];   // RAM만 초기화, publish 안 함
+        buildDeviceCards();
       }
     }, 3000);
   });
@@ -424,7 +518,16 @@ function onMessage(topic, buf){
     if(m){
       const n=parseInt(m[1]), d=JSON.parse(payload);
       state[deviceId].channels[n]={...(state[deviceId].channels[n]||{}), relay:d.relay, mode:d.mode};
-      renderChBtn(deviceId,n); return;
+      // ★ pending 해제 → 아두이노 확인된 상태로만 색깔/모드 반영
+      const key=`${deviceId}:${n}`;
+      clearTimeout(_pendingCh?.get(key));
+      _pendingCh?.delete(key);
+      renderChBtn(deviceId,n);
+      // 모달이 이 채널을 표시 중이면 탭도 동기화 (PIN 틀렸을 때 롤백 포함)
+      if(_ctx?.deviceId===deviceId && _ctx?.chNum===n){
+        _modalTab=d.mode; renderModal();
+      }
+      return;
     }
     if(topic.endsWith('/meta/online')){setOnline(deviceId,!!JSON.parse(payload).online);return;}
     if(topic.endsWith('/meta/last_seen')){
@@ -492,6 +595,10 @@ function buildDeviceCards(){
           <button onclick="addChannel('${r.id}')" class="btn-sm btn-add">+ 추가</button>
         </div>
         <p id="add-err-${r.id}" class="text-red-500 text-[10px] font-bold mt-1 hidden"></p>
+        <button onclick="showAuditLog('${r.id}')"
+          style="margin-top:10px;width:100%;padding:8px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;font-size:11px;font-weight:700;color:#64748b;cursor:pointer;">
+          📋 조작 기록 보기 (Firebase)
+        </button>
       </div>
     </div>`).join('');
 
@@ -561,16 +668,26 @@ function setOnline(deviceId,online){
   badge.textContent=online?'온라인':'오프라인';
 }
 
+// ── pending 채널 추적 ──
+const _pendingCh = new Map();
+
 // ── 채널 토글 ──
 function toggleChannel(deviceId,chNum){
   if(!client?.connected)return;
   const ch=state[deviceId]?.channels[chNum];
-  const payload=ch?.relay?'OFF':'ON';
-  client.publish(`hdh/${deviceId}/ch/${chNum}/cmd`,payload,{qos:1});
-  log(`📤 ${deviceId}/ch/${chNum}/cmd → ${payload}`,'ls');
-  if(!state[deviceId]) state[deviceId]={online:false,lastSeen:0,channels:{}};
-  state[deviceId].channels[chNum]={...(ch||{}),relay:!ch?.relay};
-  renderChBtn(deviceId,chNum);
+  const cmd=ch?.relay?'OFF':'ON';
+  const chName=ch?.name||`CH${chNum}`;
+  // ★ publishCmd: MQTT 전송 + Firebase 로그 기록
+  publishCmd(deviceId,`hdh/${deviceId}/ch/${chNum}/cmd`,cmd,`${cmd} ${chName}`);
+  // pending 깜빡임 (Arduino ch/{n}/state 응답 전까지)
+  const key=`${deviceId}:${chNum}`;
+  const circle=document.getElementById(`chbtn-${deviceId}-${chNum}`)?.querySelector('.ch-circle');
+  if(circle) circle.classList.add('pending');
+  clearTimeout(_pendingCh.get(key));
+  _pendingCh.set(key,setTimeout(()=>{
+    document.getElementById(`chbtn-${deviceId}-${chNum}`)?.querySelector('.ch-circle')?.classList.remove('pending');
+    _pendingCh.delete(key);
+  },2000));
 }
 
 // ── 채널 추가 ──
@@ -777,7 +894,11 @@ function deleteRegEntry(id){
   registry = registry.filter(r=>r.id!==id);
   clearTimeout(_retryTimers[id]);
   delete _retryTimers[id];
-  saveRegistry();
+  // 의도적 삭제: 빈 배열이어도 HiveMQ에 저장 (saveRegistry 보호 로직 우회)
+  if(client?.connected){
+    client.publish(REGISTRY_TOPIC, JSON.stringify(registry), {qos:1, retain:true});
+    log(`📤 registry 저장 (${registry.length}개)`, 'ls');
+  }
   buildDeviceCards();
   renderRegistryModal();
   log(`🗑 기기 삭제: ${id}`, 'lx');
@@ -834,11 +955,21 @@ function renderModal(){
 
 function setMode(deviceId,chNum,m,cfgPin){
   // payload: "<PIN> <mode>" → 아두이노 PIN 검증 후 모드 적용
+  // ★ 낙관적 업데이트 제거: 아두이노가 doMode 성공 후 publishState(ch)를 보내면
+  //    그때 onMessage의 ch/{n}/state 핸들러가 mode를 업데이트함
+  //    PIN이 틀리면 auth/error만 오고 state는 변하지 않으므로 UI도 그대로 유지됨
   client?.publish(`hdh/${deviceId}/ch/${chNum}/mode`,`${cfgPin} ${m}`,{qos:1});
-  log(`📤 ${deviceId}/ch/${chNum}/mode → [PIN]${m}`,'ls');
-  if(!state[deviceId])state[deviceId]={online:false,lastSeen:0,channels:{}};
-  state[deviceId].channels[chNum]={...(state[deviceId].channels[chNum]||{}),mode:m};
-  _modalTab=m; renderModal(); renderChBtn(deviceId,chNum);
+  log(`📤 ${deviceId}/ch/${chNum}/mode → [PIN]${m} (아두이노 검증 대기)`,'ls');
+  // 버튼에 pending 표시
+  const el=document.getElementById(`chbtn-${deviceId}-${chNum}`);
+  const circle=el?.querySelector('.ch-circle');
+  if(circle) circle.classList.add('pending');
+  const key=`${deviceId}:${chNum}`;
+  clearTimeout(_pendingCh.get(key));
+  _pendingCh.set(key,setTimeout(()=>{
+    document.getElementById(`chbtn-${deviceId}-${chNum}`)?.querySelector('.ch-circle')?.classList.remove('pending');
+    _pendingCh.delete(key);
+  },3000));
 }
 
 function chCfgUI(deviceId,chNum,ch){
@@ -986,6 +1117,59 @@ function setInch(deviceId,chNum){
   if(state[deviceId]?.channels[chNum])state[deviceId].channels[chNum].inching=Number(sec);
   renderModal();
 }
+</script>
+<!-- ════ Firebase Realtime Database — 조작 로그 전담 ════
+     type="module" 로 로드. 완료 후 window.fbLog / window.fbGetLogs 노출.
+     Firebase 로드 실패 시에도 MQTT 제어는 정상 동작 (옵셔널 체이닝 사용). -->
+<script type="module">
+import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import { getDatabase, ref, push, get,
+         query, limitToLast, orderByKey }         from "https://www.gstatic.com/firebasejs/12.14.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyC_n0_hPc26EGAXR__RugQLOkpc12paFUw",
+  authDomain:        "hdh-smart-farm.firebaseapp.com",
+  databaseURL:       "https://hdh-smart-farm-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "hdh-smart-farm",
+  storageBucket:     "hdh-smart-farm.firebasestorage.app",
+  messagingSenderId: "535447055597",
+  appId:             "1:535447055597:web:2ad6399e26a6efae2b30e4",
+  measurementId:     "G-E9ZFE435G4"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+// ── 로그 기록 ─────────────────────────────────────────────────────
+// window._auditUser / _auditIp / _auditAgent 는 일반 스크립트에서 설정됨
+window.fbLog = async function(deviceId, cmdDesc) {
+  try {
+    await push(ref(db, `logs/${deviceId}`), {
+      t:   new Date().toLocaleString('ko', {hour12:false}),
+      u:   window._auditUser  || '?',
+      ip:  window._auditIp    || 'unknown',
+      dv:  window._auditAgent || 'unknown',
+      cmd: String(cmdDesc).slice(0, 60)
+    });
+  } catch(e) { console.warn('[Firebase] log 실패:', e.message); }
+};
+
+// ── 최근 50건 조회 ────────────────────────────────────────────────
+window.fbGetLogs = async function(deviceId) {
+  try {
+    const snap = await get(
+      query(ref(db, `logs/${deviceId}`), orderByKey(), limitToLast(50))
+    );
+    const rows = [];
+    snap.forEach(child => rows.push(child.val()));
+    return rows.reverse();          // 최신순
+  } catch(e) {
+    console.warn('[Firebase] 조회 실패:', e.message);
+    return null;                    // null = 연결 실패
+  }
+};
+
+console.log('[Firebase] 초기화 완료 — logs/', firebaseConfig.projectId);
 </script>
 </body>
 </html>
