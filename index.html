@@ -594,6 +594,10 @@ function buildDeviceCards(){
           </select>
           <button onclick="addChannel('${r.id}')" class="btn-sm btn-add">+ 추가</button>
         </div>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11px;color:#64748b;cursor:pointer;">
+          <input type="checkbox" id="add-inv-${r.id}" checked style="width:14px;height:14px;accent-color:#3b82f6;">
+          신호 반전 (Active LOW) — 일반 릴레이 보드
+        </label>
         <p id="add-err-${r.id}" class="text-red-500 text-[10px] font-bold mt-1 hidden"></p>
         <button onclick="showAuditLog('${r.id}')"
           style="margin-top:10px;width:100%;padding:8px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;font-size:11px;font-weight:700;color:#64748b;cursor:pointer;">
@@ -695,6 +699,9 @@ function addChannel(deviceId){
   const name=document.getElementById(`add-name-${deviceId}`).value.trim();
   const pin=parseInt(document.getElementById(`add-pin-${deviceId}`).value);
   const chNum=parseInt(document.getElementById(`add-ch-${deviceId}`).value);
+  // ★ 신호 반전 체크박스: 체크=active LOW(lvl=0), 미체크=active HIGH(lvl=1)
+  const invEl=document.getElementById(`add-inv-${deviceId}`);
+  const lvl = (invEl && invEl.checked) ? 0 : 1;
   const errEl=document.getElementById(`add-err-${deviceId}`);
   const setErr=m=>{errEl.textContent=m;errEl.classList.toggle('hidden',!m);};
   setErr('');
@@ -702,11 +709,11 @@ function addChannel(deviceId){
   if(/\s/.test(name))return setErr('이름에 공백 불가.');
   if(new TextEncoder().encode(name).length>15)return setErr('이름은 UTF-8 15바이트 이하.');
   if(!Number.isInteger(pin)||pin<0||pin>127)return setErr('GPIO Pin: 0~127');
-  client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,`${pin} 1 0`,{qos:1});
+  client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,`${pin} ${lvl} 0`,{qos:1});
   client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/name`,name,{qos:1});
-  log(`📤 CH${chNum} 추가: ${name} (pin=${pin})`,'ls');
+  log(`📤 CH${chNum} 추가: ${name} (pin=${pin}, lvl=${lvl}${lvl===0?' [Active LOW]':' [Active HIGH]'})`,'ls');
   if(!state[deviceId])state[deviceId]={online:false,lastSeen:0,channels:{}};
-  state[deviceId].channels[chNum]={name,pin,lvl:1,init:0,mode:0,relay:false,schedule:[],circulate:[]};
+  state[deviceId].channels[chNum]={name,pin,lvl,init:0,mode:0,relay:false,schedule:[],circulate:[]};
   renderDevice(deviceId);
   document.getElementById(`add-name-${deviceId}`).value='';
   document.getElementById(`add-pin-${deviceId}`).value='';
@@ -932,7 +939,7 @@ function renderModal(){
   else if(tab===1)detail=schUI(deviceId,chNum,ch);
   else if(tab===2)detail=cirUI(deviceId,chNum,ch);
   else if(tab===3)detail=inchUI(deviceId,chNum,ch);
-  else detail=`<p class="text-xs text-slate-400 text-center py-3">수동 모드 — 버튼으로 직접 ON/OFF 제어합니다.</p>`;
+  else detail=manualUI(deviceId,chNum,ch);
   const hex=chHex(chNum);
   document.getElementById('modal-content').innerHTML=`
     <div class="flex items-center gap-3 mb-5">
@@ -973,7 +980,7 @@ function setMode(deviceId,chNum,m,cfgPin){
 }
 
 function chCfgUI(deviceId,chNum,ch){
-  const pin=ch.pin??0, init=ch.init??0;
+  const pin=ch.pin??0, init=Number(ch.init??0), lvl=Number(ch.lvl??1);
   return`
   <div class="setting-row mb-3">
     <p class="text-[10px] font-bold text-slate-500 mb-2">채널 이름</p>
@@ -995,7 +1002,13 @@ function chCfgUI(deviceId,chNum,ch){
              <option value="1" ${init===1?'selected':''}>ON</option>
            </select></div>
     </div>
-    <p class="text-[9px] text-slate-400 mb-2">※ 릴레이 레벨: HIGH=ON (고정)</p>
+    <div class="mb-2">
+      <label class="text-[9px] text-slate-400">신호 레벨 (릴레이 종류)</label>
+      <select id="cfg-lvl-${chNum}" class="input-sm mt-1">
+        <option value="0" ${lvl===0?'selected':''}>Active LOW — LOW=ON (일반 릴레이 보드)</option>
+        <option value="1" ${lvl===1?'selected':''}>Active HIGH — HIGH=ON (SSR·모스펫 등)</option>
+      </select>
+    </div>
     <button class="btn-sm btn-add w-full" onclick="savePin('${deviceId}',${chNum})">핀 설정 저장</button>
     <p id="cfg-pin-err-${chNum}" class="text-red-500 text-[9px] mt-1 hidden"></p>
   </div>
@@ -1022,13 +1035,14 @@ function saveName(deviceId,chNum){
 function savePin(deviceId,chNum){
   const pin=parseInt(document.getElementById(`cfg-pin-${chNum}`).value);
   const init=parseInt(document.getElementById(`cfg-init-${chNum}`).value);
+  const lvl=parseInt(document.getElementById(`cfg-lvl-${chNum}`).value);
   const errEl=document.getElementById(`cfg-pin-err-${chNum}`);
   const setErr=m=>{errEl.textContent=m;errEl.classList.toggle('hidden',!m);};
   setErr('');
   if(!Number.isInteger(pin)||pin<0||pin>127)return setErr('GPIO: 0~127');
-  client?.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,`${pin} 1 ${init}`,{qos:1});
-  log(`📤 pin CH${chNum} → ${pin} 1 ${init}`,'ls');
-  state[deviceId].channels[chNum]={...(state[deviceId].channels[chNum]||{}),pin,init};
+  client?.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,`${pin} ${lvl} ${init}`,{qos:1});
+  log(`📤 pin CH${chNum} → pin=${pin} lvl=${lvl}(${lvl===0?'ActiveLOW':'ActiveHIGH'}) init=${init}`,'ls');
+  state[deviceId].channels[chNum]={...(state[deviceId].channels[chNum]||{}),pin,lvl,init};
   closeModal();
 }
 function confirmDeleteChannel(deviceId,chNum){
@@ -1040,6 +1054,51 @@ function confirmDeleteChannel(deviceId,chNum){
   log(`📤 CH${chNum} 삭제`,'ls');
   delete state[deviceId].channels[chNum];
   closeModal(); renderDevice(deviceId);
+}
+
+// ── 수동 모드 UI (카운트다운 포함) ──
+function manualUI(deviceId,chNum,ch){
+  const on=!!ch.relay;
+  return`
+  <div class="setting-row mb-3">
+    <p class="text-[10px] font-bold text-slate-500 mb-2">직접 제어</p>
+    <div class="flex gap-2">
+      <button class="btn-sm btn-add flex-1" onclick="sendCmd('${deviceId}',${chNum},'ON')">● ON</button>
+      <button class="btn-sm btn-gray flex-1" onclick="sendCmd('${deviceId}',${chNum},'OFF')">○ OFF</button>
+      <button class="btn-sm" style="background:#f1f5f9;color:#64748b;border-radius:8px;font-size:12px;font-weight:700;padding:7px 14px;cursor:pointer;border:none;" onclick="sendCmd('${deviceId}',${chNum},'TOGGLE')">⇄ 토글</button>
+    </div>
+  </div>
+  <div class="setting-row">
+    <p class="text-[10px] font-bold text-slate-500 mb-2">⏱ 카운트다운</p>
+    <p class="text-[9px] text-slate-400 mb-2">지정 시간 후 자동으로 ON 또는 OFF 전환</p>
+    <div class="grid grid-cols-2 gap-2 mb-2">
+      <div><label class="text-[9px] text-slate-400">목표 상태</label>
+           <select id="cd-target-${chNum}" class="input-sm">
+             <option value="ON">ON으로 전환</option>
+             <option value="OFF" selected>OFF로 전환</option>
+           </select></div>
+      <div><label class="text-[9px] text-slate-400">시간 (초)</label>
+           <input id="cd-sec-${chNum}" class="input-sm" type="number" min="1" value="60"></div>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn-sm btn-add flex-1" onclick="startCountdown('${deviceId}',${chNum})">카운트다운 시작</button>
+      <button class="btn-sm btn-gray" onclick="cancelCountdown('${deviceId}',${chNum})">취소</button>
+    </div>
+  </div>`;
+}
+function sendCmd(deviceId,chNum,cmd){
+  publishCmd(deviceId,`hdh/${deviceId}/ch/${chNum}/cmd`,cmd,`수동 ${cmd} CH${chNum}`);
+}
+function startCountdown(deviceId,chNum){
+  const target=document.getElementById(`cd-target-${chNum}`)?.value||'OFF';
+  const sec=parseInt(document.getElementById(`cd-sec-${chNum}`)?.value)||60;
+  if(sec<1)return;
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/countdown`,`${target} ${sec}`,{qos:1});
+  log(`📤 countdown CH${chNum}: ${target} ${sec}초`,'ls');
+}
+function cancelCountdown(deviceId,chNum){
+  client?.publish(`hdh/${deviceId}/ch/${chNum}/cancel`,'1',{qos:1});
+  log(`📤 cancel CH${chNum}`,'ls');
 }
 
 // ── 스케줄 ──
