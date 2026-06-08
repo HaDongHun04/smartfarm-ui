@@ -589,7 +589,7 @@ function buildDeviceCards(){
         <div class="grid grid-cols-2 gap-2">
           <input id="add-name-${r.id}" class="input-field text-xs" placeholder="채널 이름">
           <input id="add-pin-${r.id}" class="input-field text-xs" type="number" min="0" max="127" placeholder="GPIO Pin">
-          <input id="add-ch-${r.id}" class="input-field text-xs" type="number" min="1" max="20" placeholder="채널 번호 (1~20)">
+          <input id="add-ch-${r.id}" class="input-field text-xs" type="number" min="1" max="28" placeholder="채널 번호 (1~28)">
           <button onclick="addChannel('${r.id}')" class="btn-sm btn-add">+ 추가</button>
         </div>
         <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11px;color:#64748b;cursor:pointer;">
@@ -631,9 +631,9 @@ function renderDevice(deviceId){
   if(inp){
     const used=[...named].sort((a,b)=>a-b);
     // 비어있는 첫 채널 번호를 기본값 placeholder로 제안
-    let next=1; while(used.includes(next)&&next<=20) next++;
-    inp.placeholder = used.length ? `채널 (사용중: ${used.join(',')})` : '채널 번호 (1~20)';
-    if(!inp.value) inp.value = next<=20 ? next : '';
+    let next=1; while(used.includes(next)&&next<=28) next++;
+    inp.placeholder = used.length ? `채널 (사용중: ${used.join(',')})` : '채널 번호 (1~28)';
+    if(!inp.value) inp.value = next<=28 ? next : '';
   }
   lucide.createIcons();
 }
@@ -712,7 +712,7 @@ function addChannel(deviceId){
   if(!name)return setErr('채널 이름을 입력하세요.');
   if(/\s/.test(name))return setErr('이름에 공백 불가.');
   if(new TextEncoder().encode(name).length>15)return setErr('이름은 UTF-8 15바이트 이하.');
-  if(!Number.isInteger(chNum)||chNum<1||chNum>20)return setErr('채널 번호: 1~20 (R4=1~12, R3=13~20)');
+  if(!Number.isInteger(chNum)||chNum<1||chNum>28)return setErr('채널 번호: 1~28 (R4=1~12, R3 모스펫=13~20, R3 LED=21~28)');
   if(!Number.isInteger(pin)||pin<0||pin>127)return setErr('GPIO Pin: 0~127');
   client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,`${pin} ${lvl} 0`,{qos:1});
   client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/name`,name,{qos:1});
