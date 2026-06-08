@@ -589,9 +589,7 @@ function buildDeviceCards(){
         <div class="grid grid-cols-2 gap-2">
           <input id="add-name-${r.id}" class="input-field text-xs" placeholder="채널 이름">
           <input id="add-pin-${r.id}" class="input-field text-xs" type="number" min="0" max="127" placeholder="GPIO Pin">
-          <select id="add-ch-${r.id}" class="input-field text-xs">
-            ${Array.from({length:12},(_,i)=>`<option value="${i+1}">CH${i+1}</option>`).join('')}
-          </select>
+          <input id="add-ch-${r.id}" class="input-field text-xs" type="number" min="1" max="20" placeholder="채널 번호 (1~20)">
           <button onclick="addChannel('${r.id}')" class="btn-sm btn-add">+ 추가</button>
         </div>
         <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11px;color:#64748b;cursor:pointer;">
@@ -629,8 +627,14 @@ function renderDevice(deviceId){
   wrap.innerHTML=named.length===0
     ?'<div class="col-span-3 text-center text-xs text-slate-400 py-4">이름이 설정된 채널이 없습니다</div>'
     :named.map(n=>chBtnHTML(deviceId,n)).join('');
-  const sel=document.getElementById(`add-ch-${deviceId}`);
-  if(sel){const used=new Set(named);sel.innerHTML=Array.from({length:12},(_,i)=>i+1).filter(n=>!used.has(n)).map(n=>`<option value="${n}">CH${n}</option>`).join('');}
+  const inp=document.getElementById(`add-ch-${deviceId}`);
+  if(inp){
+    const used=[...named].sort((a,b)=>a-b);
+    // 비어있는 첫 채널 번호를 기본값 placeholder로 제안
+    let next=1; while(used.includes(next)&&next<=20) next++;
+    inp.placeholder = used.length ? `채널 (사용중: ${used.join(',')})` : '채널 번호 (1~20)';
+    if(!inp.value) inp.value = next<=20 ? next : '';
+  }
   lucide.createIcons();
 }
 
@@ -708,6 +712,7 @@ function addChannel(deviceId){
   if(!name)return setErr('채널 이름을 입력하세요.');
   if(/\s/.test(name))return setErr('이름에 공백 불가.');
   if(new TextEncoder().encode(name).length>15)return setErr('이름은 UTF-8 15바이트 이하.');
+  if(!Number.isInteger(chNum)||chNum<1||chNum>20)return setErr('채널 번호: 1~20 (R4=1~12, R3=13~20)');
   if(!Number.isInteger(pin)||pin<0||pin>127)return setErr('GPIO Pin: 0~127');
   client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,`${pin} ${lvl} 0`,{qos:1});
   client.publish(`hdh/${deviceId}/cfg/ch/${chNum}/name`,name,{qos:1});
