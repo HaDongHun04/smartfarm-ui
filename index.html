@@ -619,7 +619,7 @@ function buildDeviceCards(){
 // ── 렌더링 ──
 function renderDevice(deviceId){
   const chs=state[deviceId]?.channels||{};
-  const named=Object.keys(chs).map(Number).filter(n=>chs[n]?.name?.trim()).sort((a,b)=>a-b);
+  const named=Object.keys(chs).map(Number).filter(n=>chs[n]?.name?.trim()||chs[n]?.pin!==undefined).sort((a,b)=>a-b);
   const wrap=document.getElementById(`channels-${deviceId}`);
   if(!wrap)return;
   wrap.innerHTML=named.length===0
