@@ -641,15 +641,18 @@ function renderDevice(deviceId){
 function chBtnHTML(deviceId,chNum){
   const ch=state[deviceId]?.channels[chNum]||{};
   const on=!!ch.relay, mode=Number(ch.mode)||0;
+  const isR3=!!ch.r3;
+  const pinMissing=isR3&&(ch.pin===255||ch.pin===undefined);
   const hex=chHex(chNum);
-  const bg=on?`background:${hex}`:'';
+  const bg=on&&!pinMissing?`background:${hex}`:'';
   const mtag=['','mt-sch','mt-cir','mt-inc'][mode]||'';
   const mlbl=['','스케줄','순환','인칭'][mode]||'';
   return `
   <div class="ch-btn" id="chbtn-${deviceId}-${chNum}">
     ${mode>0?`<span class="mode-tag ${mtag}">${mlbl}</span>`:''}
-    <div class="ch-circle ${on?'on':'off'}" style="${bg}" onclick="toggleChannel('${deviceId}',${chNum})">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:${on?'#fff':'#94a3b8'}">
+    ${isR3?'<span class="mode-tag" style="background:#fef3c7;color:#92400e;top:-9px;">R3</span>':''}
+    <div class="ch-circle ${on&&!pinMissing?'on':'off'}" style="${bg}" onclick="${pinMissing?`openCfg('${deviceId}',${chNum})`:`toggleChannel('${deviceId}',${chNum})`}">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:${on&&!pinMissing?'#fff':'#94a3b8'}">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v4M6.34 6.34l2.83 2.83M3 12h4M6.34 17.66l2.83-2.83M12 17v4M17.66 17.66l-2.83-2.83M21 12h-4M17.66 6.34l-2.83 2.83"/>
       </svg>
       <span class="ch-gear" onclick="event.stopPropagation();openCfg('${deviceId}',${chNum})">
@@ -659,8 +662,8 @@ function chBtnHTML(deviceId,chNum){
         </svg>
       </span>
     </div>
-    <span class="text-[11px] font-bold text-center leading-tight" style="color:${on?hex:'#64748b'}">
-      ${esc(ch.name||'CH'+chNum)}<br><span class="text-[9px] text-slate-400 font-normal">CH${chNum}</span>
+    <span class="text-[11px] font-bold text-center leading-tight" style="color:${on&&!pinMissing?hex:'#64748b'}">
+      ${pinMissing?'<span style="color:#f59e0b;font-size:9px;">⚙핀설정</span>':esc(ch.name||'CH'+chNum)}<br><span class="text-[9px] text-slate-400 font-normal">CH${chNum}${isR3?' (R3)':''}</span>
     </span>
   </div>`;
 }
