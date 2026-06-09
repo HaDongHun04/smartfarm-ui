@@ -126,7 +126,7 @@
 </div>
 
 <!-- 채널 설정 모달 -->
-<div id="cfg-modal" class="modal-bg hidden" onclick="if(event.target===this)closeModal()">
+<div id="cfg-modal" class="modal-bg hidden" onmousedown="if(event.target===this) this.dataset.md=1; else this.dataset.md=0;" onmouseup="if(event.target===this && this.dataset.md==='1') closeModal(); this.dataset.md=0;">
   <div class="modal-sheet" id="cfg-sheet">
     <div class="modal-handle" onclick="closeModal()" title="닫기"></div>
     <button class="modal-close-btn" onclick="closeModal()">✕</button>
@@ -135,7 +135,7 @@
 </div>
 
 <!-- 기기 레지스트리 모달 -->
-<div id="registry-modal" class="modal-bg hidden" onclick="if(event.target===this)closeRegistryModal()">
+<div id="registry-modal" class="modal-bg hidden" onmousedown="if(event.target===this) this.dataset.md=1; else this.dataset.md=0;" onmouseup="if(event.target===this && this.dataset.md==='1') closeRegistryModal(); this.dataset.md=0;">
   <div class="modal-sheet" id="registry-sheet">
     <div class="modal-handle" onclick="closeRegistryModal()" title="닫기"></div>
     <button class="modal-close-btn" onclick="closeRegistryModal()">✕</button>
@@ -305,7 +305,9 @@ async function showAuditLog(deviceId){
         <p style="text-align:center;padding:20px;color:#94a3b8;">⏳ Firebase에서 불러오는 중…</p>
       </div>
     </div>`;
-  div.onclick = e => { if(e.target===div) closeAuditModal(); };
+  // 드래그 닫힘 방지 (조작 기록 모달에도 적용)
+  div.onmousedown = e => { if(e.target===div) div.dataset.md=1; else div.dataset.md=0; };
+  div.onmouseup = e => { if(e.target===div && div.dataset.md==='1') closeAuditModal(); div.dataset.md=0; };
   document.body.appendChild(div);
 
   // Firebase에서 최근 50건 조회
@@ -525,7 +527,11 @@ function onMessage(topic, buf){
       renderChBtn(deviceId,n);
       // 모달이 이 채널을 표시 중이면 탭도 동기화 (PIN 틀렸을 때 롤백 포함)
       if(_ctx?.deviceId===deviceId && _ctx?.chNum===n){
-        _modalTab=d.mode; renderModal();
+        // ★ 탭 강제 전환 방지: 현재 보고 있는 탭이 '채널설정(cfg)' 이라면 탭을 바꾸지 않음
+        if(_modalTab !== 'cfg') {
+          _modalTab=d.mode; 
+        }
+        renderModal();
       }
       return;
     }
