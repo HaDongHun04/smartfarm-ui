@@ -1038,7 +1038,7 @@ function saveName(deviceId,chNum){
   log(`📤 name CH${chNum} → ${val}`,'ls');
   if(!state[deviceId])state[deviceId]={online:false,lastSeen:0,channels:{}};
   state[deviceId].channels[chNum]={...(state[deviceId].channels[chNum]||{}),name:val};
-  closeModal(); renderDevice(deviceId);
+  renderDevice(deviceId); renderModal();
 }
 function savePin(deviceId,chNum){
   const pin=parseInt(document.getElementById(`cfg-pin-${chNum}`).value);
@@ -1051,7 +1051,6 @@ function savePin(deviceId,chNum){
   client?.publish(`hdh/${deviceId}/cfg/ch/${chNum}/pin`,`${pin} ${lvl} ${init}`,{qos:1});
   log(`📤 pin CH${chNum} → pin=${pin} lvl=${lvl}(${lvl===0?'ActiveLOW':'ActiveHIGH'}) init=${init}`,'ls');
   state[deviceId].channels[chNum]={...(state[deviceId].channels[chNum]||{}),pin,lvl,init};
-  closeModal();
 }
 function confirmDeleteChannel(deviceId,chNum){
   const name=(state[deviceId]?.channels[chNum]||{}).name||`CH${chNum}`;
