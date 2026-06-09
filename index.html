@@ -487,9 +487,11 @@ function onMessage(topic, buf){
   }
   if(topic.endsWith('/auth/ok')){
     log(`✅ PIN 검증 성공`, 'lr');
-    closeModal();
+    closePinModal();          // PIN 입력 팝업만 닫음 (설정 모달은 유지)
     const deviceId = topic.split('/')[1];
-    setTimeout(()=>client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}),300);
+    // 모드 변경 성공 → 아두이노가 publishState(ch)도 보내므로 ch/state 핸들러가 탭 동기화함
+    // 보조로 최신 상태 요청
+    setTimeout(()=>client?.publish(`hdh/${deviceId}/get/state`,'GET',{qos:1}),200);
     return;
   }
   if(topic === REGISTRY_TOPIC){
