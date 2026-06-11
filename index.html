@@ -224,8 +224,10 @@ function onPinKey(i, e) {
 function submitPin() {
   const entered = [0,1,2,3].map(i => document.getElementById(`pd${i}`).value).join('');
   if (entered.length < 4) { document.getElementById('pin-err').textContent = '4자리를 모두 입력하세요.'; return; }
+  // ★ closePinModal()이 _pinCallback을 null로 만들기 전에 먼저 보관
+  const cb = _pinCallback;
   closePinModal();
-  if (_pinCallback) { _pinCallback(entered); _pinCallback = null; }
+  if (cb) cb(entered);
 }
 function closePinModal() {
   const el = document.getElementById('pin-modal');
